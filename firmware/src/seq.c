@@ -163,7 +163,7 @@ static uint32_t layer_buttons(void) { return fm1_in.buttons | (ly_lock != LY_PLA
 /* Clipper: the layers a synth keeps: SEQ (the steps), SEL (key and chords) and (1.0, the sequencer of SLOOP 2.7.2)
  * EDIT (erase, SHIFT, LENGTH, TRANSPOSE, undo / redo), ARP (note repeat) and GLO (fill, fill bar, tap tempo, the level).
  * FX and SAVE only open their pages; held, the keys still play */
-static int ly_on(uint32_t l) { return !CLIPPER_SYNTH || (l != LY_FX && l != LY_SONG); }
+static int ly_on(uint32_t l) { return !CLIPPER_SYNTH || l != LY_SONG; }   /* (FX: the twists, twist.c) */
 static uint32_t layer_now(void)
 {
     uint32_t b = layer_buttons(), l;
@@ -2269,6 +2269,13 @@ static void key_down(uint32_t k)
     kb_trk[k] = (uint8_t)sel;
     kb_n[k] = 0;
     switch (layer) {
+#if CLIPPER_SYNTH
+    case LY_FX:                                       /* FX held: the twists (the UI's, twist.c) */
+        kb_kind[k] = KS_UI;
+        kb_nt[k][0] = (uint8_t)layer;
+        lk_push(layer, k, 1);
+        return;
+#else
     case LY_FX: {                                     /* FX held: the white keys pick a punch-in effect */
         int32_t fx = punch_key(k);
         kb_kind[k] = KS_FX;
@@ -2278,6 +2285,7 @@ static void key_down(uint32_t k)
         }
         return;
     }
+#endif
     case LY_STEP:
     case LY_SCALE:
     case LY_MIX:
@@ -3615,6 +3623,7 @@ static void events_block(uint32_t n)
     roll_block(adv);
     for (i = 0; i < (CLIPPER_SYNTH ? 1u : NPART); i++)
         arp_tick(&trk[i], adv);
+    tw_block(adv);                                     /* the twists (twist.c) */
 #if CLIPPER_SYNTH
     for (i = 0; i < NPART; i++)
         mseq_tick(&trk[i], adv);                       /* (0.8) the MOD SEQ of both sounds */

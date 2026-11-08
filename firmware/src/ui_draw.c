@@ -427,6 +427,8 @@ UI_SMALL static int big_page(const page_t *pg) { return pg->graph == GR_NONE && 
 #if CLIPPER_SYNTH
 UI_SMALL static int bb_sounding(const track_t *t, uint32_t *tv, uint32_t *n);
 static void graph_bytes(void);
+static int cats_alive(void);
+static void cats_draw(void);
 #endif
 UI_SMALL static uint32_t graph_signature(void)
 {
@@ -812,6 +814,73 @@ static void graph_bytes(void)
             cv_rect((int32_t)x * 3, (int32_t)y * 3, 3, 3, bb_color(prog, (q[y][x] - lo) * 255u / sp, q[y][x], x, y, base >> 8));
 }
 
+/* the CATS: every note drops a cat on the screen, its fur a bytebeat formula, its colours its own; they live a moment and
+ * go. Original pixel art. The knobs: FX held, the "cats" key (ui_layers.c). */
+#define CAT_W 16
+#define CAT_H 12
+static const char *const CAT_ART[CAT_H] = {"..X..........X..", ".XXX........XXX.", ".XXXXXXXXXXXXXX.", ".XXXXXXXXXXXXXX.", "XXXooXXXXXXooXXX",
+                                           "XXXooXXXXXXooXXX", "XXXXXXXXXXXXXXXX", "XXXXXXXppXXXXXXX", ".XXXXXXppXXXXXX.", ".XXpXXXXXXXXpXX.",
+                                           "..XXpppppppXXX..", "...XXXXXXXXXX..."};
+#define CAT_N 8u
+static struct { uint8_t on, note, size, form, pal; int16_t x, y; uint16_t age, life; uint32_t seed; } cats[CAT_N];
+static uint8_t cats_on = 1, cat_r, cat_next;
+static uint32_t cat_seed = 0x2545F491u;
+static uint32_t cat_rnd(void) { cat_seed ^= cat_seed << 13; cat_seed ^= cat_seed >> 17; cat_seed ^= cat_seed << 5; return cat_seed; }
+static void cat_spawn(uint32_t note)
+{
+    uint32_t i = cat_next++ % CAT_N, s = cat_size, w = CAT_W * s, h = CAT_H * s;
+    cats[i].on = 1, cats[i].note = (uint8_t)note, cats[i].size = (uint8_t)s, cats[i].form = cat_form, cats[i].age = 0;
+    cats[i].pal = (uint8_t)(cat_pal < 4u ? cat_pal : cat_rnd() >> 7 & 3u);
+    cats[i].x = (int16_t)(w < 240u ? (cat_rnd() >> 8) % (240u - w + 1u) : 0u);
+    cats[i].y = (int16_t)(h < H_GRAPH ? (cat_rnd() >> 8) % (H_GRAPH - h + 1u) : 0u);
+    cats[i].seed = cat_rnd();
+    cats[i].life = (uint16_t)(6u + (uint32_t)cat_life * 8u);
+}
+static void cat_w_preview(void) { cat_spawn(60u + (cat_rnd() >> 9) % 24u); }
+static int cats_alive(void)
+{
+    uint32_t i, a = 0;
+    while (cat_r != cat_w) {
+        uint32_t n = cat_q[cat_r & 7u];
+        cat_r++;
+        if (cats_on)
+            cat_spawn(n);
+    }
+    for (i = 0; i < CAT_N; i++)
+        a |= cats[i].on;
+    return (int)a;
+}
+static void cats_draw(void)
+{
+    uint32_t i;
+    for (i = 0; i < CAT_N; i++) {
+        uint32_t x, y;
+        int32_t var[10] = {128, 128, 128, 128, 0, 0, 0, 0, 0, 0};
+        if (!cats[i].on)
+            continue;
+        var[9] = cats[i].note;
+        for (y = 0; y < CAT_H; y++)
+            for (x = 0; x < CAT_W; x++) {
+                char c = CAT_ART[y][x];
+                uint16_t col;
+                if (c == '.')
+                    continue;
+                if (c == 'o')
+                    col = C_WHITE;
+                else if (c == 'p')
+                    col = C_BLACK;
+                else {
+                    uint32_t tt = cats[i].seed + (uint32_t)cats[i].note * 256u + y * 256u + x * 16u + (uint32_t)cats[i].age * 64u, v;
+                    var[8] = (int32_t)tt;
+                    v = (uint32_t)bb_run(cats[i].form, (int32_t)tt, var) & 255u;
+                    col = bb_color(cats[i].pal, v | 24u, v, x, y, (uint32_t)cats[i].age + cats[i].note);
+                }
+                cv_rect(cats[i].x + (int32_t)(x * cats[i].size), cats[i].y + (int32_t)(y * cats[i].size), cats[i].size, cats[i].size, col);
+            }
+        if (++cats[i].age >= cats[i].life)
+            cats[i].on = 0;
+    }
+}
 #endif
 /* Clipper: HOME, the instrument: the sound's name large, its kind and place in the list, its engine; the
  * scope under it (from the top of the graph strip: cv_oy 0) */
@@ -905,6 +974,10 @@ UI_SMALL static void draw_graph(void)
         return;
     }
     sig = graph_signature();
+#if CLIPPER_SYNTH
+    if (cats_alive())
+        sig ^= (ui.frame + 1u) * 2166136261u;
+#endif
     if (!ui.force && sig == ui.graph_sig)
         return;
     ui.graph_sig = sig;
@@ -989,6 +1062,11 @@ UI_SMALL static void draw_graph(void)
             break;
         }
     }
+#if CLIPPER_SYNTH
+    cv_oy = 0;
+    cats_draw();
+    cv_oy = G_OY;
+#endif
     top = (ui.home && CLIPPER_SYNTH) || (!ui.home && !drum_note && (pg->graph == GR_BROWSE || pg->graph == GR_SLOTS || pg->graph == GR_USER ||
                                      pg->graph == GR_ROLL || big_page(pg)));   /* these draw from the top */
     cv_oy = 0;

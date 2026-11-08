@@ -749,7 +749,7 @@ static uint32_t layer_mode(void)
     int32_t m = trk[1].p[P_LYMODE];
     return m == LY_LAYER || m == LY_SPLIT || m == LY_MULTI ? (uint32_t)m : LY_OFF;
 }
-static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
+static void trk_note_on0(track_t *t, uint32_t note, uint32_t vel)
 {
     uint32_t m, r = 1;
     if (t != &trk[0] || note > 127u) {
@@ -771,7 +771,7 @@ static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
     if (r & 1u)
         trk_note_on1(t, note, vel);
 }
-static void trk_note_off(track_t *t, uint32_t note)
+static void trk_note_off0(track_t *t, uint32_t note)
 {
     uint32_t r;
     if (t != &trk[0] || note > 127u) {
@@ -785,6 +785,28 @@ static void trk_note_off(track_t *t, uint32_t note)
     if (r & 1u)
         trk_note_off1(t, note);
 }
+#include "twist.c"                 /* FX held: the twists, on the notes (METAL KAP 2) */
+static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
+{
+#if CLIPPER_SYNTH
+    if (t == &trk[0] && note < 128u) {
+        tw_init();
+        tw_on(note, vel);
+        return;
+    }
+#endif
+    trk_note_on0(t, note, vel);
+}
+static void trk_note_off(track_t *t, uint32_t note)
+{
+#if CLIPPER_SYNTH
+    if (t == &trk[0] && note < 128u) {
+        tw_off(note);
+        return;
+    }
+#endif
+    trk_note_off0(t, note);
+}
 static void trk_sustain_up(track_t *t)
 {
     trk_sustain_up1(t);
@@ -794,6 +816,10 @@ static void trk_sustain_up(track_t *t)
 static void trk_all_off(track_t *t)
 {
     trk_all_off1(t);
+#if CLIPPER_SYNTH
+    if (t == &trk[0])
+        tw_clear();
+#endif
     if (t == &trk[0]) {
         trk_all_off1(&trk[1]);
         memset(ly_route, 0, sizeof ly_route);
@@ -1512,7 +1538,7 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
             continue;                                   /* held at a silent sustain (SUS 0): nothing to render */
         {   /* the pitch in 1/4096 semitone: glide, LFO, the pitch envelope; the fraction goes into the increment */
             int32_t q = (v->pitch_cur << 8) + v->pitch_frac + ((lfo * p[P_LD_PIT] * 3) >> 7) +
-                        ((v->penv * p[P_ED_PIT] * 3) >> 7) + bend;
+                        ((v->penv * p[P_ED_PIT] * 3) >> 7) + bend + ((uint32_t)(t - trk) < NPART ? tw_bend : 0);
 #if CLIPPER_SYNTH
             {   /* VIB: up to +-half a semitone */
                 int32_t vd = (p[P_MWDST] == MD_VIB ? mw : 0) + (p[P_ATDST] == MD_VIB ? (e == &ENG_HYBRID ? 0 : v->pat > cat ? v->pat : cat) : 0);

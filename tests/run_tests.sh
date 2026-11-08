@@ -207,6 +207,8 @@ run "BYTE: the stack machine against METAL KAP 2's, every factory formula" "$OUT
 sed "/^int main(void)/,\$d" tests/synth8_test.c | sed "s#\"hostsim.c\"#\"$PWD/tests/hostsim.c\"#; s#\"../firmware#\"$PWD/firmware#" > "$OUT/synth8_head.c"
 $SYN -I"$OUT" -o "$OUT/bytebeat_engine_test" tests/bytebeat_engine_test.c -lm
 run "BYTE: presets bounded and audible, t follows the pitch, T the tempo" "$OUT/bytebeat_engine_test"
+$SYN -I"$OUT" -o "$OUT/twist_test" tests/twist_test.c -lm
+run "Twists: no hanging note, parameters given back" "$OUT/twist_test"
 $SYN -o "$OUT/synth8_test" tests/synth8_test.c -lm
 run "Clipper 0.8: JUNO (presets, tune, PW, HPF, the chorus I / II / I+II, no click, as an INSERT), VECTOR (corners, MOVE), the MOD SEQ (KEY, SYNC, LEN, SMTH, to CUT / AMP, projects, user presets), SPICE / DICE (arp, sequencer)" "$OUT/synth8_test"
 if $SYN_UB -o "$OUT/synth8_ub" tests/synth8_test.c -lm 2>/dev/null; then

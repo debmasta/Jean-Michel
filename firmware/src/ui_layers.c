@@ -24,7 +24,7 @@
 #define UI_SMALL                                   /* (gfx.c: minsize on the device; a test alone: nothing) */
 #endif
 static const uint8_t LAYER_BTN[LY_COUNT] = {NB, B_FX, B_EDIT, B_ARP, B_SEQ, B_SCL, B_GLO, B_SAVE};
-static const char *const LAYER_NAME[LY_COUNT] = {"", "punch", "erase", "roll", "steps", "key", "mix", "song"};
+static const char *const LAYER_NAME[LY_COUNT] = {"", CLIPPER_SYNTH ? "twist" : "punch", "erase", "roll", "steps", "key", "mix", "song"};
 static void section_store(uint32_t s);                  /* project.c */
 static void section_load(uint32_t s);
 static uint8_t sec_armed;                               /* store over a used section: the key again within 3 s */
@@ -346,6 +346,27 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
         return;
     }
     switch (layer) {
+#if CLIPPER_SYNTH
+    case LY_FX:                                         /* the twists: a key latches one and takes the knobs */
+        tw_init();
+        if (w < 0 || w >= (int32_t)TW_N)
+            return;
+        ui.layer_used = 1;
+        if (w == TW_ALLOFF) {
+            tw_mask = 0;
+        } else if (w == TW_CATS) {
+            if (tw_sel == TW_CATS)
+                cats_on = !cats_on;
+            tw_sel = TW_CATS;
+        } else {
+            if (tw_sel == (uint32_t)w || !((tw_mask >> w) & 1u))
+                tw_mask ^= 1u << w;
+            tw_sel = (uint8_t)w;
+        }
+        tw_apply();
+        ui.force = 1;
+        return;
+#endif
     case LY_STEP:
         if (w < 0) {                                    /* the first four black keys: pages 1..4 */
             static const int8_t PG[12] = {-1, 0, -1, 1, -1, 2, -1, -1, 3, -1, -1, -1};
@@ -498,6 +519,20 @@ UI_SMALL static void layer_knobs(uint32_t layer)
         ui.hot_t = 40;
         switch (layer) {
         case LY_FX:
+#if CLIPPER_SYNTH
+            tw_init();
+            if (tw_sel == TW_CATS) {
+                if (k == 0u) cat_size = (uint8_t)clamp((int32_t)cat_size + s, 1, 5);
+                else if (k == 1u) cat_form = (uint8_t)clamp((int32_t)cat_form + s, 0, (int32_t)BB_N - 1);
+                else if (k == 2u) cat_life = (uint8_t)clamp((int32_t)cat_life + s, 0, 7);
+                else cat_pal = (uint8_t)clamp((int32_t)cat_pal + s, 0, 4);
+                cat_w_preview();
+            } else if (k < TW_NP && TW_PAR[tw_sel][k].n) {
+                tw_p[tw_sel][k] = (uint8_t)clamp((int32_t)tw_p[tw_sel][k] + s, 0, TW_PAR[tw_sel][k].n - 1);
+                tw_apply();
+            }
+            break;
+#endif
             if (k == 0u)
                 song.g[G_FILT] = (int16_t)clamp(song.g[G_FILT] + accel(EN_K1, s, 127), -64, 63);
             else if (k == 1u)
@@ -677,6 +712,37 @@ UI_SMALL static void layer_screen_draw(void)
         trk_short_name(0, sub);
     switch (layer) {
     case LY_FX:                                         /* the 16 punch-in effects */
+#if CLIPPER_SYNTH
+        tw_init();
+        col = TE_RED;
+        str_cpy(sub, tw_sel == TW_CATS ? "cats" : TW_LAB[tw_sel], sizeof sub);
+        for (i = 0; i < 16u; i++) {
+            int on = i == TW_CATS ? cats_on : (int)((tw_mask >> i) & 1u);
+            str_cpy(tl[i].lab, TW_LAB[i], 8);
+            tl[i].bg = on ? C_WHITE : TE_G1;
+            tl[i].fg = on ? C_BLACK : TE_G4;
+            tl[i].top = i == tw_sel ? TE_RED : TE_DIM[i / 4u];
+        }
+        if (tw_sel == TW_CATS) {
+            static const char *const PN[5] = {"ACID", "RGB", "NEON", "HEAT", "MIX"};
+            lab[0] = "size", lab[1] = "form", lab[2] = "life", lab[3] = "color";
+            fmt_int(v[0], cat_size); str_cpy(v[1], N_BB[cat_form], 8); fmt_int(v[2], cat_life); str_cpy(v[3], PN[cat_pal], 8);
+            ratio[0] = cat_size * 200, ratio[1] = cat_form * 1000 / ((int32_t)BB_N - 1), ratio[2] = cat_life * 1000 / 7, ratio[3] = cat_pal * 250;
+        } else {
+            uint32_t kp;
+            for (kp = 0; kp < 4u; kp++) {
+                const tw_par_t *pa = kp < TW_NP ? &TW_PAR[tw_sel][kp] : 0;
+                if (pa && pa->n) {
+                    lab[kp] = pa->lab;
+                    str_cpy(v[kp], pa->names[tw_p[tw_sel][kp]], 8);
+                    ratio[kp] = pa->n > 1u ? tw_p[tw_sel][kp] * 1000 / (pa->n - 1) : 0;
+                } else {
+                    lab[kp] = "", v[kp][0] = 0, ratio[kp] = -1;
+                }
+            }
+        }
+        break;
+#endif
         col = TE_DRUM;
         str_cpy(sub, "hold + key", sizeof sub);
         for (i = 0; i < 16u; i++) {

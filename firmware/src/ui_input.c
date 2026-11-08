@@ -110,6 +110,12 @@ UI_SMALL static uint32_t keys_lit(void)
     track_t *t = TSEL;
     switch (ui.layer) {
     case LY_FX:
+#if CLIPPER_SYNTH
+        for (i = 0; i < 16u; i++)
+            if (i == TW_CATS ? cats_on : (int)((tw_mask >> i) & 1u))
+                m |= 1u << key_of_white(i);
+        return m;
+#endif
         return punch.req >= 0 ? 1u << key_of_white((uint32_t)punch.req) : 0u;
     case LY_STEP: {                                /* the steps that play; the playhead blinks */
         uint32_t len = trk_len(t);
