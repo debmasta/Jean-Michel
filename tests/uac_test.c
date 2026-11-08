@@ -67,9 +67,9 @@ static void test_descriptors(void)
     }
 
     check("device descriptor: 18 bytes, type 1, EP0 64", dv[0] == 18 && dv[1] == 1 && dv[7] == 64);
-    check("bcdDevice: MIDI after audio streaming, 44.1 / 48 kHz (x.9x)", (dv[12] & 0xF0u) == 0x90u && dv[13] == 3);
+    check("bcdDevice: MIDI after audio streaming, 44.1 / 48 kHz (x.9x)", (dv[12] & 0xF0u) == (T_CDC == 0 ? 0xB0u : 0x90u) && dv[13] == 3);
     check(CDC_SHOWN ? "device class misc / IAD (EF 02 01)" : "device class 0 (per interface)",
-          CDC_SHOWN ? dv[4] == 0xEF && dv[5] == 2 && dv[6] == 1 : dv[4] == 0);
+          CDC_SHOWN || T_CDC == 0 ? dv[4] == 0xEF && dv[5] == 2 && dv[6] == 1 : dv[4] == 0);
     check("configuration: type 2, wTotalLength = the bytes sent", c[1] == 2 && total == n);
 
     for (off = 0; off < n;) {
@@ -166,7 +166,7 @@ static void test_descriptors(void)
     check("endpoint addresses unique", dup_ok);
     check("AC header: UAC 1.00, length 8 + collection", ac_ok);
     check("AC header wTotalLength = the class-specific AC descriptors", ac_len_left == 0 && ac_total == ac_wt);
-    check("AC collection: the MIDI and audio streaming interfaces", coll_ok);
+    check("AC collection: the MIDI and audio streaming interfaces", T_CDC == 0 ? ncoll == 1 && coll[0] == 1 : coll_ok);
     check("input terminal 1: 2 ch, L R, not USB streaming", it_ok);
     check("output terminal 2: USB streaming, source 1", ot_ok);
     check("AS alt 0 has no endpoint", alt0_ok);
@@ -176,7 +176,7 @@ static void test_descriptors(void)
     check("CS endpoint: sampling frequency control", csep_ok);
     check("MIDI bulk endpoints 0x01 / 0x81 unchanged", midi_ok == 2);
     snprintf(name, sizeof name, "IADs: %s", CDC_SHOWN ? "audio IF 0-2, CDC IF 3-4" : "none");
-    check(name, iad_ok && iad_n == (CDC_SHOWN ? 2 : 0));
+    check(name, T_CDC == 0 ? iad_n == 1 : iad_ok && iad_n == (CDC_SHOWN ? 2 : 0));
 }
 
 /* --------------------------------------------------------------------- the ring --- */

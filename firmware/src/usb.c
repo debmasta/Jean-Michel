@@ -192,7 +192,10 @@ static void midi_out_event(uint32_t pkt)            /* from the audio ISR */
     5, 0x25, 1, 1, 1, \
     9, 5, 0x81, 2, 64, 0, 0, 0, 0, \
     5, 0x25, 1, 1, 3,
-#define CFG_LEN (101 + 74 * FELUCCA_CDC + 74 * FELUCCA_UAC + 3 * FELUCCA_UAC_48K)
+/* the host-compat set (darosh/fm1-experiments, macOS 13-15), without the console: the AC collection names the audio
+ * streaming interface alone, the audio function has an IAD, the device is misc / IAD and has a serial number */
+#define USB_COMPAT (FELUCCA_UAC && !FELUCCA_CDC)
+#define CFG_LEN (101 + 74 * FELUCCA_CDC + 74 * FELUCCA_UAC + 3 * FELUCCA_UAC_48K + 7 * USB_COMPAT)
 #define USB_NIF (2 + FELUCCA_UAC + 2 * FELUCCA_CDC)
 #if FELUCCA_CDC
 static const uint8_t DEV_DESC[18] = {18, 1, 0x00, 0x02, 0xEF, 0x02, 0x01, 64, 0x09, 0x12, 0x01, 0x00,
@@ -204,15 +207,27 @@ static const uint8_t CFG_DESC[] = {
 #ifndef FELUCCA_USB_PID
 #define FELUCCA_USB_PID 0x0001   /* the update loader is 0x0002 */
 #endif
+#if USB_COMPAT
+static const uint8_t DEV_DESC[18] = {18, 1, 0x00, 0x02, 0xEF, 0x02, 0x01, 64, 0x09, 0x12, FELUCCA_USB_PID & 0xFF,
+                                     FELUCCA_USB_PID >> 8, 0x10 * (FELUCCA_UAC + FELUCCA_UAC_48K) + 0x90, 0x03, 1, 2, 3, 1};
+static const uint8_t CFG_DESC[] = {
+    9, 2, CFG_LEN & 0xFF, CFG_LEN >> 8, USB_NIF, 1, 0, 0x80, 50,
+    8, 0x0B, 0, 2, 1, 1, 0, 0,                          /* IAD: audio control + audio streaming */
+#else
 static const uint8_t DEV_DESC[18] = {18, 1, 0x10, 0x01, 0, 0, 0, 64, 0x09, 0x12, FELUCCA_USB_PID & 0xFF,
                                      FELUCCA_USB_PID >> 8, 0x00 + 0x10 * (FELUCCA_UAC + FELUCCA_UAC_48K) + 0x70 * FELUCCA_UAC, 0x03,
                                      1, 2, 0, 1};
 static const uint8_t CFG_DESC[] = {
     9, 2, CFG_LEN & 0xFF, CFG_LEN >> 8, USB_NIF, 1, 0, 0x80, 50,
 #endif
+#endif
     9, 4, 0, 0, 0, 1, 1, 0, 0,
 #if FELUCCA_UAC
+#if USB_COMPAT
+    9, 0x24, 1, 0x00, 0x01, 30, 0, 1, UAC_AS_IF,        /* AC header 1.00: audio streaming alone */
+#else
     10, 0x24, 1, 0x00, 0x01, 31, 0, 2, 1, UAC_AS_IF,    /* AC header 1.00: audio + MIDI streaming */
+#endif
     12, 0x24, 2, 1, 0x03, 0x06, 0, 2, 0x03, 0x00, 0, 0, /* input terminal 1: line, 2 ch (L R) */
     9, 0x24, 3, 2, 0x01, 0x01, 0, 1, 0,                 /* output terminal 2: USB streaming, from 1 */
 #else
@@ -277,6 +292,9 @@ static int usb_cdc_now(void) { return usb_cdc_on; }   /* (the menu: what this st
 static int usb_cdc_now(void) { return 0; }
 #endif
 static const uint8_t STR0[4] = {4, 3, 0x09, 0x04};
+#if USB_COMPAT
+static const uint8_t STR3[] = {16, 3, 'J', 0, 'M', 0, '-', 0, 'F', 0, 'M', 0, '1', 0, 'B', 0};   /* a serial of its own: no cached name */
+#endif
 static const uint8_t STR1[] = {42, 3, 'H', 0, 0xFC, 0, 'g', 0, 'e', 0, 'l', 0, 't', 0, 'o', 0, 'n', 0, ' ', 0, 'I', 0,
                                'n', 0, 's', 0, 't', 0, 'r', 0, 'u', 0, 'm', 0, 'e', 0, 'n', 0, 't', 0, 's', 0};
 #ifdef FELUCCA_LOADER
@@ -369,6 +387,12 @@ static int get_desc(uint32_t wvalue, const uint8_t **d, uint16_t *l)
             *d = STR0;
             *l = sizeof STR0;
             return 1;
+#if USB_COMPAT
+        case 3:
+            *d = STR3;
+            *l = sizeof STR3;
+            return 1;
+#endif
         case 1:
             *d = STR1;
             *l = sizeof STR1;
