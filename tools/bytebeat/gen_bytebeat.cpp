@@ -8,7 +8,7 @@
 #include <vector>
 struct F { const char* name; const char* preset; const char* src; };
 // every knob at noon (128) is the original formula; C and D are common to all: C an xor ramp, D a tempo-stepped offset
-#define W(f) "(" f ")^((c-128)*t>>8)+(d-128)*(T>>10&7)"
+#define W(f) f   /* C and D are applied by the firmware itself (bb_eval), lighter than in the program */
 static const F BANK[] = {
     {"42", "BB 42 MELODY", W("t*(a*21/64&t>>(b>>4)+2)")},
     {"SIERP", "BB SIERPINSKI", W("t*(b>>6)/2&t>>(a>>4)")},

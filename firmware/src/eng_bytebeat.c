@@ -14,6 +14,9 @@
 #include "bb_vm.h"
 _Static_assert(BB_MAXDEPTH < BB_STACK, "a factory formula is deeper than the VM's stack");
 
+/* T: worked out once a block (twist.c tw_block), not per voice: a 64-bit division is dear on this CPU */
+static uint64_t bb_Tnow, bb_Tstep;
+
 static void bb_note_on(track_t *t, voice_t *v)
 {
     (void)t;
@@ -32,7 +35,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
     uint32_t mask = 0xFFu << (((uint32_t)clamp(p[P_E7], 0, 127) * 7u) / 127u);
     uint64_t tq = (uint64_t)v->ph[1] << 32 | v->ph[0];
     uint64_t step = ((uint64_t)m->inc * 125248u) >> 12;    /* 8000 steps a second at C4: 8000 / 261.6256 (Q12) */
-    uint64_t Tq, Tstep = ((uint64_t)(uint32_t)song.g[G_BPM] << 28) / BEAT_U;
+    uint64_t Tq, Tstep = bb_Tstep;
     int playing = song.playing;
     int32_t var[10], r = v->s[3], lt = v->s[6], lT = v->s[7], ic1 = v->s[0], ic2 = v->s[1], cut, dc = v->s[2];
     tsvf_t f;
@@ -42,7 +45,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
     var[4] = var[5] = var[6] = var[7] = 0;
     var[9] = v->note;
     if (playing)
-        Tq = ((uint64_t)clk_beat << 28) + (((uint64_t)clk_pos << 28) / BEAT_U);
+        Tq = bb_Tnow;
     else
         Tq = (uint64_t)v->ph[2] << 16 | (uint16_t)v->s[5];
     cut = clamp((p[P_E5] << 8) + m->cutoff, 0, 127 << 8);
@@ -55,7 +58,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
             lt = ti;
             lT = Ti;
             var[8] = Ti;
-            r = (int32_t)((uint32_t)bb_run(prog, ti, var) & mask & 255u);
+            r = (int32_t)((uint32_t)bb_eval(prog, ti, var) & mask & 255u);
         }
         tq += step;
         Tq += Tstep;

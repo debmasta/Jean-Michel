@@ -299,6 +299,8 @@ static void tw_block(uint32_t adv)
     static uint8_t was_arp;
     uint32_t i;
     int32_t semis = 0;
+    bb_Tnow = ((uint64_t)clk_beat << 28) + (((uint64_t)clk_pos << 28) / BEAT_U);
+    bb_Tstep = ((uint64_t)(uint32_t)song.g[G_BPM] << 28) / BEAT_U;
     if (!tw_ready)
         return;
     for (i = 0; i < TW_NE; i++)

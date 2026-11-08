@@ -803,7 +803,7 @@ static void graph_bytes(void)
         for (x = 0; x < BB_VW; x++) {
             uint32_t tt = base + y * 256u + x * 16u / 5u, v;
             var[8] = (int32_t)tt;
-            v = (uint32_t)bb_run(prog, (int32_t)tt, var) & mask & 255u;
+            v = (uint32_t)bb_eval(prog, (int32_t)tt, var) & mask & 255u;
             q[y][x] = (uint8_t)v;
             lo = v < lo ? v : lo;
             hi = v > hi ? v : hi;

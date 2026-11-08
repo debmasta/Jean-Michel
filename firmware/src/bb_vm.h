@@ -59,4 +59,11 @@ static int32_t bb_run(uint32_t prog, int32_t t, const int32_t *var)
     }
     return sp > 0 ? s[sp - 1] : 0;
 }
-
+/* the formula, then the two knobs common to all: C an xor ramp, D an offset stepped at the tempo; at noon, nothing to do */
+static int32_t bb_eval(uint32_t prog, int32_t t, const int32_t *var)
+{
+    int32_t r = bb_run(prog, t, var);
+    if (var[2] != 128 || var[3] != 128)
+        r ^= ((int32_t)((uint32_t)(var[2] - 128) * (uint32_t)t) >> 8) + (var[3] - 128) * ((var[8] >> 10) & 7);
+    return r;
+}
