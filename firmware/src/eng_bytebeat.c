@@ -1,0 +1,110 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* BYTE: bytebeat. A formula of t gives an 8-bit sample for every step of t (METAL KAP 2's engine: the stack program of
+ * tools/bytebeat/Bytebeat.h, compiled ahead of time into bb_bank.h, so nothing is parsed here and the formulas take no RAM).
+ * EDIT 1  FORM  A  B  C  D      the formula; its variables a b c d (0..255)
+ * EDIT 2  CUT  RES  BITS        a 12 dB low-pass; BITS drops the sample's low bits
+ * Variables: t; a..d; T = t locked to the tempo (1024 a 16th: T>>10 a 16th, T>>12 a beat, T>>14 a bar; the transport's
+ * when it plays, else its own clock from the note's start, at the tempo); n = the note.
+ * Pitch: t runs 8000 steps a second at C4, in proportion for the other notes.
+ * Integers wrap, shifts are & 31, x / 0 = 0: as in the METAL KAP 2 plugin, sample for sample.
+ * State: ph[0..1] t (Q32), ph[2] + s[5] the free clock's T (Q16); s[0..1] filter, s[2] DC blocker, s[3] the held sample,
+ * s[6] s[7] the t and the T it was computed for */
+#include "bb_bank.h"
+#include "bb_vm.h"
+_Static_assert(BB_MAXDEPTH < BB_STACK, "a factory formula is deeper than the VM's stack");
+
+static void bb_note_on(track_t *t, voice_t *v)
+{
+    (void)t;
+    v->ph[0] = v->ph[1] = v->ph[2] = 0;
+    v->s[5] = 0;
+    v->s[3] = 128;
+    v->s[6] = v->s[7] = -1;
+    if (!v->env && !v->env_out)
+        v->s[0] = v->s[1] = v->s[2] = 0;
+}
+
+static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
+{
+    const int16_t *p = t->p;
+    uint32_t prog = (uint32_t)clamp(p[P_E0], 0, (int32_t)BB_N - 1), i;
+    uint32_t mask = 0xFFu << (((uint32_t)clamp(p[P_E7], 0, 127) * 7u) / 127u);
+    uint64_t tq = (uint64_t)v->ph[1] << 32 | v->ph[0];
+    uint64_t step = ((uint64_t)m->inc * 125248u) >> 12;    /* 8000 steps a second at C4: 8000 / 261.6256 (Q12) */
+    uint64_t Tq, Tstep = ((uint64_t)(uint32_t)song.g[G_BPM] << 28) / BEAT_U;
+    int playing = song.playing;
+    int32_t var[10], r = v->s[3], lt = v->s[6], lT = v->s[7], ic1 = v->s[0], ic2 = v->s[1], cut, dc = v->s[2];
+    tsvf_t f;
+    int filt;
+    for (i = 0; i < 4u; i++)
+        var[i] = (clamp(p[P_E1 + i], 0, 127) * 255 + 63) / 127;
+    var[4] = var[5] = var[6] = var[7] = 0;
+    var[9] = v->note;
+    if (playing)
+        Tq = ((uint64_t)clk_beat << 28) + (((uint64_t)clk_pos << 28) / BEAT_U);
+    else
+        Tq = (uint64_t)v->ph[2] << 16 | (uint16_t)v->s[5];
+    cut = clamp((p[P_E5] << 8) + m->cutoff, 0, 127 << 8);
+    filt = cut < (127 << 8) || p[P_E6];
+    if (filt)
+        tsvf_coef(&f, cut, clamp(p[P_E6], 0, 127));
+    for (i = 0; i < n; i++) {
+        int32_t ti = (int32_t)(tq >> 32), Ti = (int32_t)(Tq >> 16), y;
+        if (ti != lt || Ti != lT) {
+            lt = ti;
+            lT = Ti;
+            var[8] = Ti;
+            r = (int32_t)((uint32_t)bb_run(prog, ti, var) & mask & 255u);
+        }
+        tq += step;
+        Tq += Tstep;
+        y = (2 * r - 255) * 100;
+        if (filt)
+            y = tsvf_lp(&f, y, &ic1, &ic2);
+        dc += ((y << 8) - dc) >> 9;
+        y -= dc >> 8;
+        out[i] += voice_amp(soft_knee(y, 24000), m, i);
+    }
+    v->ph[0] = (uint32_t)tq;
+    v->ph[1] = (uint32_t)(tq >> 32);
+    if (!playing) {
+        v->ph[2] = (uint32_t)(Tq >> 16);
+        v->s[5] = (int32_t)(Tq & 0xFFFFu);
+    }
+    v->s[0] = ic1;
+    v->s[1] = ic2;
+    v->s[2] = dc;
+    v->s[3] = r;
+    v->s[6] = lt;
+    v->s[7] = lT;
+}
+
+/* {FORM, A, B, C, D, CUT, RES, BITS} */
+static const preset_t BB_PRESETS[] = {
+#define BB_P(i, name) {name, {i, 64, 64, 64, 64, 127, 0, 0}, {0, 70, 127, 30}, 0, 0, FX(0, 0, 15, 15)},
+    BB_PRESET_LIST(BB_P)
+#undef BB_P
+};
+
+static const engine_t ENG_BYTE = {
+    .name = "BYTE",
+    .page_title = {"FORMULA", "TONE"},
+    .edit = {
+        {"FORM", F_ENUM, 0, BB_N - 1, 0, N_BB, 0},
+        {"A", F_INT, 0, 127, 64, 0, 0},
+        {"B", F_INT, 0, 127, 64, 0, 0},
+        {"C", F_INT, 0, 127, 64, 0, 0},
+        {"D", F_INT, 0, 127, 64, 0, 0},
+        {"CUT", F_CUTOFF, 0, 127, 127, 0, 0},
+        {"RES", F_PCT, 0, 127, 0, 0, 0},
+        {"BITS", F_PCT, 0, 127, 0, 0, 0},
+    },
+    .presets = BB_PRESETS,
+    .npresets = NELEM(BB_PRESETS),
+    .note_on = bb_note_on,
+    .render = bb_render,
+    .fil_page = 1,
+    .color = 0xFD20,
+    .macro = {P_E1, P_E2, P_E3, P_E5},
+    .poly = 4,
+};

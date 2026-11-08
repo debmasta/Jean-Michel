@@ -67,7 +67,7 @@ static void test_descriptors(void)
     }
 
     check("device descriptor: 18 bytes, type 1, EP0 64", dv[0] == 18 && dv[1] == 1 && dv[7] == 64);
-    check("bcdDevice bumped for the audio input at 44.1 / 48 kHz (x.2x)", (dv[12] & 0xF0u) == 0x20u && dv[13] == 3);
+    check("bcdDevice: MIDI after audio streaming, 44.1 / 48 kHz (x.9x)", (dv[12] & 0xF0u) == 0x90u && dv[13] == 3);
     check(CDC_SHOWN ? "device class misc / IAD (EF 02 01)" : "device class 0 (per interface)",
           CDC_SHOWN ? dv[4] == 0xEF && dv[5] == 2 && dv[6] == 1 : dv[4] == 0);
     check("configuration: type 2, wTotalLength = the bytes sent", c[1] == 2 && total == n);
