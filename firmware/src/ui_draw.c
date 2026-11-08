@@ -976,7 +976,7 @@ UI_SMALL static void draw_graph(void)
     sig = graph_signature();
 #if CLIPPER_SYNTH
     if (cats_alive())
-        sig ^= (ui.frame + 1u) * 2166136261u;
+        sig ^= ((ui.frame >> 1) + 1u) * 2166136261u;   /* (every other frame: lighter on the machine) */
 #endif
     if (!ui.force && sig == ui.graph_sig)
         return;

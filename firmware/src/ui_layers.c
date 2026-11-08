@@ -349,7 +349,17 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
 #if CLIPPER_SYNTH
     case LY_FX:                                         /* the twists: a key latches one and takes the knobs */
         tw_init();
-        if (w < 0 || w >= (int32_t)TW_N)
+        if (w < 0) {                                    /* the first black keys: page 1, page 2 */
+            static const int8_t PG[12] = {-1, 0, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1};
+            if (k < 12u && PG[k] >= 0) {
+                tw_page = (uint8_t)PG[k];
+                ui.layer_used = 1;
+                ui.force = 1;
+            }
+            return;
+        }
+        w += 16 * (int32_t)tw_page;
+        if (w >= (int32_t)TW_N)
             return;
         ui.layer_used = 1;
         if (w == TW_ALLOFF) {
@@ -717,11 +727,12 @@ UI_SMALL static void layer_screen_draw(void)
         col = TE_RED;
         str_cpy(sub, tw_sel == TW_CATS ? "cats" : TW_LAB[tw_sel], sizeof sub);
         for (i = 0; i < 16u; i++) {
-            int on = i == TW_CATS ? cats_on : (int)((tw_mask >> i) & 1u);
-            str_cpy(tl[i].lab, TW_LAB[i], 8);
+            uint32_t ti = i + 16u * tw_page;
+            int on = ti >= TW_N ? 0 : ti == TW_CATS ? cats_on : (int)((tw_mask >> ti) & 1u);
+            str_cpy(tl[i].lab, ti < TW_N ? TW_LAB[ti] : "", 8);
             tl[i].bg = on ? C_WHITE : TE_G1;
             tl[i].fg = on ? C_BLACK : TE_G4;
-            tl[i].top = i == tw_sel ? TE_RED : TE_DIM[i / 4u];
+            tl[i].top = ti == tw_sel ? TE_RED : TE_DIM[i / 4u];
         }
         if (tw_sel == TW_CATS) {
             static const char *const PN[5] = {"ACID", "RGB", "NEON", "HEAT", "MIX"};

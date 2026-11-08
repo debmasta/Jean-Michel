@@ -5,7 +5,9 @@
  * Runs in the audio ISR (tw_on, tw_off, tw_block) except the parts that change a parameter (tw_apply, the UI). */
 #if CLIPPER_SYNTH
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
-       TW_ALLOFF, TW_CATS, TW_N };
+       TW_ALLOFF, TW_CATS,
+       /* page 2 (the first black keys pick the page) */
+       TW_BLFO, TW_TARP, TW_MUT, TW_N };
 #define TW_NSC 19u
 static const int8_t TW_SC[TW_NSC][13] = {
     {0, 1, 3, 5, 7, 8, 10, -1}, {0, 2, 3, 7, 8, -1}, {0, 2, 4, 6, 8, 10, -1}, {0, 2, 3, 5, 7, 8, 10, -1}, {0, 3, 5, 7, 10, -1},
@@ -14,7 +16,7 @@ static const int8_t TW_SC[TW_NSC][13] = {
     {0, 2, 3, 6, 7, 8, 11, -1}, {0, 3, 5, 6, 7, 10, -1}, {0, 2, 4, 7, 9, -1}, {0, 1, 5, 7, 10, -1}, {0, 1, 4, 5, 7, 8, 11, -1}};
 static const char *const TW_SCN[TW_NSC] = {"PHRYG", "HIRAJ", "WHOLE", "MINOR", "MPENT", "MAJOR", "CHROM", "HMIN", "MMIN", "DORI", "LYDI",
                                            "MIXO", "LOCR", "PDOM", "HUNG", "BLUES", "PENT", "INSEN", "DHARM"};
-#define TW_NP 3u
+#define TW_NP 4u
 typedef struct { const char *lab; uint8_t n, def; const char *const *names; } tw_par_t;
 static const char *const TN_STUT[] = {"1/4", "1/8.", "1/8", "1/8T", "1/16", "1/16T", "1/32", "1/64", "1/128"};
 static const char *const TN_ROLL[] = {"TICK", "1/32T", "1/32", "1/16T", "1/16", "ACCEL"};
@@ -32,6 +34,12 @@ static const char *const TN_PIT[] = {"2", "5", "12", "24"};
 static const char *const TN_FLT[] = {"SOFT", "MID", "FULL"};
 static const char *const TN_THR[] = {"HALF", "FULL"};
 static const char *const TN_SPD[] = {"/4", "/2", "x2", "x4", "x8"};
+static const char *const TN_DEST[] = {"CUT", "PITCH", "SHAPE"};
+static const char *const TN_DEPTH[] = {"10", "25", "50", "75", "100"};
+static const char *const TN_LRATE[] = {"1/4", "1/8", "1/16", "1/32", "1/64", "FAST"};
+static const char *const TN_LAB[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"};
+static const char *const TN_TSET[] = {"OCTS", "5THS", "DARK", "WIDE"};
+static const char *const TN_MUT[] = {"SOFT", "MID", "WILD"};
 #define NN(a) (uint8_t)(sizeof(a) / sizeof(a[0]))
 static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_STUT] = {{"rate", NN(TN_STUT), 4, TN_STUT}},
@@ -48,11 +56,15 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_FUP] = {{"amount", NN(TN_FLT), 1, TN_FLT}},
     [TW_THROW] = {{"amount", NN(TN_THR), 1, TN_THR}},
     [TW_SPEED] = {{"mult", NN(TN_SPD), 1, TN_SPD}},
+    [TW_BLFO] = {{"form", 16, 0, TN_LAB}, {"dest", NN(TN_DEST), 0, TN_DEST}, {"depth", NN(TN_DEPTH), 2, TN_DEPTH}, {"speed", NN(TN_LRATE), 2, TN_LRATE}},
+    [TW_TARP] = {{"set", NN(TN_TSET), 0, TN_TSET}, {"rate", NN(TN_ARATE), 2, TN_ARATE}},
+    [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
+static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
 static uint8_t tw_p[TW_N][TW_NP];
 static uint8_t tw_ready;
 /* the cats: ON, and their four knobs */
@@ -61,12 +73,16 @@ static volatile uint8_t cat_q[8];
 static uint8_t cat_size = 2, cat_form, cat_life = 3, cat_pal = 4;   /* (cat_pal 4: a palette per cat) */
 
 static volatile int32_t tw_bend;                 /* 1/4096 semitone, read by voice.c */
+static volatile int32_t tw_lcut, tw_lshape;      /* BYTE LFO: added to each voice's cutoff, shape (0..127 << 8 scale) */
+static volatile int32_t tw_lfo_a = 128, tw_lfo_b = 128;   /* its a and b (MIDI CC 87, 88: the sticks) */
 #define TW_NH 8u
 static struct { uint8_t in, out, cur, on, vel; uint8_t ai; } tw_h[TW_NH];
 #define TW_NE 12u
 static struct { uint8_t kind, note, vel; int32_t left; } tw_ev[TW_NE];   /* kind 0 none, 1 note on, 2 note off */
 static uint32_t tw_acc, tw_st, tw_ticks, tw_oalt;
 static int32_t tw_deg;
+static int16_t tw_mut_base[8];
+static uint8_t tw_mut_have;
 static uint32_t tw_rand = 0x9E3779B9u;
 static uint32_t tw_rnd(uint32_t n) { tw_rand ^= tw_rand << 13; tw_rand ^= tw_rand >> 17; tw_rand ^= tw_rand << 5; return (tw_rand >> 8) % n; }
 /* MIDI, held from outside (the FM-1 PAD plugin, the game controller): CC 102..115 hold twists 0..13 while >= 64, on top of the
@@ -130,6 +146,16 @@ static void tw_on(uint32_t note, uint32_t vel)
     cat_q[cat_w & 7u] = (uint8_t)note;
     RING_PUBLISH();
     cat_w++;
+    if (tw_is(TW_MUT)) {                         /* MUTATE: this note, the sound's numbers thrown around where they are */
+        static const uint8_t R[3] = {10, 28, 64};
+        const engine_t *e = ENGINES[t->engine % NENGINES];
+        uint32_t k, a = R[tw_v(TW_MUT, 0)];
+        for (k = 0; k < 8u; k++) {
+            const param_desc_t *d = &e->edit[k];
+            if (!d->names && d->max > d->min && (tw_mut_have >> k & 1u))
+                t->p[P_E0 + k] = (int16_t)clamp(tw_mut_base[k] + (int32_t)tw_rnd(2u * a + 1u) - (int32_t)a, d->min, d->max);
+        }
+    }
     if (tw_is(TW_OCT)) {
         static const int8_t J[5] = {0, 12, -12, 24, 12};
         uint32_t md = tw_v(TW_OCT, 0), a = tw_oalt++;
@@ -218,6 +244,55 @@ static void tw_home(void)
             trk_note_on0(&trk[0], tw_h[i].out, tw_h[i].vel);
         }
 }
+/* TRIPLE ARP: three arps at once on the first held note, 3, 4 and 5 steps long: they drift apart and meet again every 60 */
+static uint8_t tp_on, tp_cur[3], tp_step;
+static uint32_t tp_acc, tw_free_T;
+static void tp_stop(void)
+{
+    uint32_t j;
+    if (!tp_on)
+        return;
+    tp_on = 0;
+    for (j = 0; j < 3u; j++)
+        trk_note_off0(&trk[0], tp_cur[j]);
+}
+static void tw_triple(uint32_t adv)
+{
+    static const int8_t L[4][3][5] = {
+        {{0, 12, 24}, {7, 12, 19, 31}, {-12, 0, 12, 24, 36}},
+        {{0, 7, 14}, {5, 12, 19, 24}, {-5, 2, 7, 14, 19}},
+        {{0, 3, 7}, {-12, -9, -5, 1}, {12, 15, 13, 19, 22}},
+        {{0, 19, 31}, {-12, 24, 7, 36}, {12, -5, 31, 2, 24}}};
+    static const uint8_t LEN[3] = {3, 4, 5}, D[4] = {24, 8, 4, 2};
+    uint32_t i, j;
+    for (i = 0; i < TW_NH && !tw_h[i].on; i++)
+        ;
+    if (!tw_is(TW_TARP) || i == TW_NH) {
+        if (tp_on) {
+            tp_stop();
+            if (i < TW_NH) {                         /* back to the note you hold */
+                tw_h[i].cur = tw_h[i].out;
+                trk_note_on0(&trk[0], tw_h[i].out, tw_h[i].vel);
+            }
+        }
+        tp_acc = 0, tp_step = 0;
+        return;
+    }
+    tp_acc += adv;
+    if (tp_on && tp_acc < (uint32_t)tw_units(1, D[tw_v(TW_TARP, 1)]))
+        return;
+    tp_acc = 0;
+    if (!tp_on)
+        trk_note_off0(&trk[0], tw_h[i].cur);         /* the held note makes room */
+    else
+        tp_stop();
+    for (j = 0; j < 3u; j++) {
+        tp_cur[j] = (uint8_t)clamp((int32_t)tw_h[i].out + L[tw_v(TW_TARP, 0)][j][tp_step % LEN[j]], 0, 127);
+        trk_note_on0(&trk[0], tp_cur[j], tw_h[i].vel * (3u - j) / 3u + 1u);
+    }
+    tp_on = 1;
+    tp_step = (uint8_t)((tp_step + 1u) % 60u);
+}
 /* once per control block, adv = its length in clock units */
 static void tw_block(uint32_t adv)
 {
@@ -285,6 +360,32 @@ static void tw_block(uint32_t adv)
             semis += P[tw_v(TW_PUP, 0)];
     }
     tw_bend = (semis + tw_cc_semi) * 4096;
+    tw_triple(adv);
+    {   /* BYTE LFO: a formula's bytes as a modulation, locked to the tempo */
+        static uint32_t freeq;
+        tw_lcut = tw_lshape = 0;
+        if (tw_is(TW_BLFO)) {
+            static const uint8_t SH[6] = {12, 11, 10, 9, 8, 6}, DP[5] = {10, 25, 50, 75, 100};
+            uint32_t Tn;
+            int32_t var[10] = {tw_lfo_a, tw_lfo_b, 128, 128, 0, 0, 0, 0, 0, 60}, v, depth = DP[tw_v(TW_BLFO, 2)], m;
+            if (song.playing)
+                Tn = (uint32_t)(((uint64_t)clk_beat << 12) + (((uint64_t)clk_pos << 12) / BEAT_U));
+            else {
+                freeq += adv;
+                while (freeq >= BEAT_U >> 12)
+                    freeq -= BEAT_U >> 12, tw_free_T++;
+                Tn = tw_free_T;
+            }
+            var[8] = (int32_t)Tn;
+            v = bb_run(tw_v(TW_BLFO, 0), (int32_t)((Tn >> SH[tw_v(TW_BLFO, 3)]) * 257u), var) & 255;   /* (a step of the grid = 257 of t: its bytes and its high bits both move) */
+            m = (v - 128) * depth / 100;                  /* -128 .. 127 */
+            switch (tw_v(TW_BLFO, 1)) {
+            case 0: tw_lcut = m * 96; break;              /* up to +-48 steps of the cutoff */
+            case 1: tw_bend += m * 12 * 4096 / 128; break;   /* up to +-12 semitones */
+            default: tw_lshape = m * 96; break;
+            }
+        }
+    }
 }
 /* (UI) the twists that are a parameter while they are on: GLIDE THROW FILT SPEED */
 static int16_t tw_keep[4];
@@ -301,6 +402,17 @@ static void tw_apply(void)
         t->p[P_GLIDE] = tw_is(TW_GLIDE) ? GL[tw_v(TW_GLIDE, 0)] : tw_keep[0];
         if (!tw_is(TW_GLIDE))
             tw_kept &= (uint8_t)~1u;
+    }
+    if (tw_is(TW_MUT) && !tw_mut_have) {         /* MUTATE: the sound as it is, given back when it ends */
+        uint32_t k;
+        for (k = 0; k < 8u; k++)
+            tw_mut_base[k] = t->p[P_E0 + k];
+        tw_mut_have = 0xFFu;
+    } else if (!tw_is(TW_MUT) && tw_mut_have) {
+        uint32_t k;
+        tw_mut_have = 0;
+        for (k = 0; k < 8u; k++)
+            t->p[P_E0 + k] = tw_mut_base[k];
     }
     if (!(tw_kept & 2u) && tw_is(TW_THROW))
         tw_keep[1] = t->p[P_DLY], tw_kept |= 2u;
@@ -328,6 +440,16 @@ static void tw_apply(void)
 /* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
 static int tw_midi_cc(uint32_t cc, uint32_t v)
 {
+    if (cc == 85u || cc == 86u || cc == 118u) {   /* the page 2 twists held: 118 BYTE LFO, 85 TRIPLE ARP, 86 MUTATE */
+        uint32_t b = 1u << (cc == 118u ? TW_BLFO : cc == 85u ? TW_TARP : TW_MUT);
+        tw_init();
+        if (v >= 64u) tw_cc |= b; else tw_cc &= ~b;
+        return 1;
+    }
+    if (cc == 87u || cc == 88u) {
+        if (cc == 87u) tw_lfo_a = (int32_t)v * 2; else tw_lfo_b = (int32_t)v * 2;
+        return 1;
+    }
     if (cc >= 102u && cc <= 115u) {
         tw_init();
         if (v >= 64u)

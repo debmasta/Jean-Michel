@@ -63,6 +63,26 @@ int main(void)
         tw_midi_cc(104 + 8, 127); tw_poll(); chk("a parameter twist held by CC reaches its parameter", song.g[G_FILT] != 0 || tw_is(TW_FDN)); tw_midi_cc(112, 0); tw_poll();
         tw_midi_cc(102 + TW_THROW, 127); { int16_t d0 = tw_keep[1]; (void)d0; tw_poll(); chk("THROW by CC opens the delay", trk[0].p[P_DLY] > 0); } tw_midi_cc(102 + TW_THROW, 0); tw_poll();
     }
+    {   /* page 2 */
+        int16_t e[8]; uint32_t voices = 0;
+        quiet(); host_preset(&trk[0], 0u, 0); trk[0].p[P_AMODE] = 0;
+        for (k = 0; k < 8u; k++) e[k] = trk[0].p[P_E0 + k];
+        tw_mask = 1u << TW_MUT; tw_apply();
+        for (k = 0; k < 8u; k++) { trk_note_on(&trk[0], 60, 100); run(5); trk_note_off(&trk[0], 60); run(5); }
+        { int moved = 0; for (k = 0; k < 8u; k++) moved |= trk[0].p[P_E0 + k] != e[k]; chk("MUTATE moves the sound", moved); }
+        tw_mask = 0; tw_apply();
+        { int same = 1; for (k = 0; k < 8u; k++) same &= trk[0].p[P_E0 + k] == e[k]; chk("and gives it back exactly", same); }
+        quiet(); host_preset(&trk[0], ENGI_BYTE, 0); trk[0].p[P_AMODE] = 0;
+        tw_mask = 1u << TW_TARP; trk_note_on(&trk[0], 48, 100); run(400);
+        for (k = 0; k < NVOICE; k++) voices += trk[0].v[k].gate != 0;
+        chk("TRIPLE ARP sounds three notes", voices == 3u);
+        tw_mask = 0; run(20); voices = 0; for (k = 0; k < NVOICE; k++) voices += trk[0].v[k].gate != 0;
+        chk("then only the note held", voices == 1u);
+        trk_note_off(&trk[0], 48); run(2000); chk("and none after", !live());
+        quiet(); host_preset(&trk[0], ENGI_BYTE, 0); trk[0].p[P_AMODE] = 0; tw_p[TW_BLFO][1] = 0;
+        tw_mask = 1u << TW_BLFO; trk_note_on(&trk[0], 48, 100); { int32_t a = 0x7FFFFFFF, b = -a; for (k = 0; k < 200u; k++) { run(8); if (tw_lcut < a) a = tw_lcut; if (tw_lcut > b) b = tw_lcut; } chk("BYTE LFO moves the cutoff", b > a); }
+        tw_mask = 0; trk_note_off(&trk[0], 48); run(2000); chk("bounded, no hanging note", bounded() && !live() && (run(10), tw_lcut == 0));
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

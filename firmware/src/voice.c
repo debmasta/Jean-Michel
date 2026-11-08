@@ -1568,9 +1568,17 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
                 m.inc += (uint32_t)((int32_t)(m.inc >> 12) * m.fine);
         }
         m.cutoff = ((lfo * p[P_LD_FLT]) >> 7) + ((m.envq15 * p[P_ED_FLT]) >> 7);
+#if CLIPPER_SYNTH
+        if ((uint32_t)(t - trk) < NPART)
+            m.cutoff += tw_lcut;                       /* BYTE LFO (twist.c) */
+#endif
         if (v->vel > 110)                               /* accent opens the filter with the env */
             m.cutoff += (m.envq15 * 24) >> 7;
         m.shape = (64 << 8) + ((lfo * p[P_LD_SHP]) >> 7) + ((m.envq15 * p[P_ED_SHP]) >> 7);
+#if CLIPPER_SYNTH
+        if ((uint32_t)(t - trk) < NPART)
+            m.shape += tw_lshape;
+#endif
 #if CLIPPER_SYNTH
         {   /* VEL>F: around velocity 96, up to ~2 octaves up (127) and ~4.5 down (32); CUT: up to ~4 octaves,
              * WAH: the sound's LFO on the cutoff, up to ~+-2 octaves; SHP: the shape up to its top */

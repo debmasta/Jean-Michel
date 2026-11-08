@@ -111,9 +111,11 @@ UI_SMALL static uint32_t keys_lit(void)
     switch (ui.layer) {
     case LY_FX:
 #if CLIPPER_SYNTH
-        for (i = 0; i < 16u; i++)
-            if (i == TW_CATS ? cats_on : (int)((tw_mask >> i) & 1u))
+        for (i = 0; i < 16u; i++) {
+            uint32_t ti = i + 16u * tw_page;
+            if (ti < TW_N && (ti == TW_CATS ? cats_on : (int)((tw_mask >> ti) & 1u)))
                 m |= 1u << key_of_white(i);
+        }
         return m;
 #endif
         return punch.req >= 0 ? 1u << key_of_white((uint32_t)punch.req) : 0u;
