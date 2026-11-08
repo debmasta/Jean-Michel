@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* BYTE: bytebeat. A formula of t gives an 8-bit sample for every step of t (METAL KAP 2's engine: the stack program of
  * tools/bytebeat/Bytebeat.h, compiled ahead of time into bb_bank.h, so nothing is parsed here and the formulas take no RAM).
- * EDIT 1  FORM  A  B  C  D      the formula; its variables a b c d (0..255)
+ * EDIT 1  FORM  A  B  C  D      the formula; its variables a b c d (0..254), at noon the original formula; A B its own
+ *                               numbers, C an xor ramp, D an offset stepped at the tempo (every formula)
  * EDIT 2  CUT  RES  BITS        a 12 dB low-pass; BITS drops the sample's low bits
  * Variables: t; a..d; T = t locked to the tempo (1024 a 16th: T>>10 a 16th, T>>12 a beat, T>>14 a bar; the transport's
  * when it plays, else its own clock from the note's start, at the tempo); n = the note.
@@ -37,7 +38,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
     tsvf_t f;
     int filt;
     for (i = 0; i < 4u; i++)
-        var[i] = (clamp(p[P_E1 + i], 0, 127) * 255 + 63) / 127;
+        var[i] = clamp(p[P_E1 + i], 0, 127) * 2;          /* (noon, 64: 128, the original formula) */
     var[4] = var[5] = var[6] = var[7] = 0;
     var[9] = v->note;
     if (playing)

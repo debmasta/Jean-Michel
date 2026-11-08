@@ -7,23 +7,25 @@
 #include <string>
 #include <vector>
 struct F { const char* name; const char* preset; const char* src; };
+// every knob at noon (128) is the original formula; C and D are common to all: C an xor ramp, D a tempo-stepped offset
+#define W(f) "(" f ")^((c-128)*t>>8)+(d-128)*(T>>10&7)"
 static const F BANK[] = {
-    {"42", "BB 42 MELODY", "t*(42&t>>10)"},
-    {"SIERP", "BB SIERPINSKI", "t&t>>(5+(a>>5))"},
-    {"NEURO", "BB NEUROFUNK", "t*(t>>5|t>>8)>>(t>>16)"},
-    {"CROWD", "BB CROWD", "t*(t>>11&t>>8&123&t>>3)"},
-    {"STEPS", "BB STEPS", "t*((T>>12&3)+1)&(a|t>>8)"},
-    {"MELO", "BB MELODIE", "t*\"CGEGCAFA\"[T>>11]>>6"},
-    {"METAL", "BB METAL", "t*5&t>>7|t*3&t>>10"},
-    {"DUB", "BB DUB", "(t>>6|t|t>>(t>>16))*10+(t>>11&7)"},
-    {"BREAK", "BB BREAK", "(T>>10&1?t*3:t)&(T>>12&3)*85^t>>(a>>4)"},
-    {"ARP", "BB ARP", "t*(1+(5&T>>10))&(96|b)"},
-    {"GLTCH", "BB GLITCH", "t*(t^t+(t>>15|1)^(t-1280^t)>>10)"},
-    {"STAIR", "BB STAIRS", "t*((T>>10&7)+1)>>(a>>5)"},
-    {"PWM", "BB PWM", "(t&255)<(T>>4&255)?255:0"},
-    {"HISS", "BB HISS", "t*t*t>>(a>>4)"},
-    {"KICK", "BB KICK LOOP", "(255e3/(1+(T&4095))&255)|(T>>10&b)"},
-    {"HARM", "BB HARMONICS", "t*(a&T>>10)/8"},
+    {"42", "BB 42 MELODY", W("t*(a*21/64&t>>(b>>4)+2)")},
+    {"SIERP", "BB SIERPINSKI", W("t*(b>>6)/2&t>>(a>>4)")},
+    {"NEURO", "BB NEUROFUNK", W("t*(t>>(a>>5)+1|t>>(b>>4))>>(t>>16)")},
+    {"CROWD", "BB CROWD", W("t*(t>>(a>>4)+3&t>>(b>>4)&123&t>>3)")},
+    {"STEPS", "BB STEPS", W("t*((T>>(b>>4)+4&3)+1)&(a|t>>8)")},
+    {"MELO", "BB MELODIE", W("t*\"CGEGCAFA\"[T>>(a>>4)+3]>>(b>>4)-2")},
+    {"METAL", "BB METAL", W("t*(a>>5)+t&t>>7|t*(b>>6)+t&t>>10")},
+    {"DUB", "BB DUB", W("(t>>(a>>5)+2|t|t>>(t>>16))*(b*10/128)+(t>>11&7)")},
+    {"BREAK", "BB BREAK", W("(T>>10&1?t*(b>>6)+t:t)&(T>>12&3)*85^t>>(a>>4)")},
+    {"ARP", "BB ARP", W("t*(1+((a>>5)+1&T>>10))&(96|b)")},
+    {"GLTCH", "BB GLITCH", W("t*(t^t+(t>>15|1)^(t-a*10^t)>>(b>>4)+2)")},
+    {"STAIR", "BB STAIRS", W("t*((T>>10&(b>>5)+3)+1)>>(a>>5)")},
+    {"PWM", "BB PWM", W("(t&255)<(T>>(a>>5)&b*2-1)?255:0")},
+    {"HISS", "BB HISS", W("t*t*(t+b-128)>>(a>>4)")},
+    {"KICK", "BB KICK LOOP", W("(a*255e3/128/(1+(T&4095))&255)|(T>>10&b)")},
+    {"HARM", "BB HARMONICS", W("t*(a&T>>(b>>4)+2)/8")},
 };
 int main() {
     std::vector<int> ops, args; std::string strs; std::vector<int> off, len; int maxDepth = 0;

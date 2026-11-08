@@ -424,6 +424,10 @@ UI_SMALL static uint32_t str_hash(uint32_t h, const char *s)
 
 /* a page drawn with its values large (graph_big) */
 UI_SMALL static int big_page(const page_t *pg) { return pg->graph == GR_NONE && pg->scope != SC_SONG && pg->scope != SC_DRUM; }
+#if CLIPPER_SYNTH
+UI_SMALL static int bb_sounding(const track_t *t, uint32_t *tv, uint32_t *n);
+static void graph_bytes(void);
+#endif
 UI_SMALL static uint32_t graph_signature(void)
 {
     const page_t *pg = cur_page();
@@ -437,6 +441,13 @@ UI_SMALL static uint32_t graph_signature(void)
     if (ui.home)
         return h ^ (ui.frame / 2u);                  /* scope: redraw every other frame */
     h ^= (uint32_t)pg->graph * 131u + TSEL->eng_req + song.sel * 7777u;
+#if CLIPPER_SYNTH
+    if (pg->scope == SC_ENGINE && TSEL->eng_req == ENGI_BYTE) {   /* BYTE: the picture scrolls with the note */
+        uint32_t bt, bn;
+        if (bb_sounding(TSEL, &bt, &bn))
+            h ^= (ui.frame / 3u) * 2166136261u;
+    }
+#endif
     for (i = 0; i < P_COUNT; i++)
         h = (h ^ (uint32_t)t->p[i]) * 16777619u;
     h ^= (uint32_t)TSEL->preset * 7u + (uint32_t)song.g[G_SLOT] * 13u + TSEL->user * 257u + up_gen * 7919u + ui.uslot * 104729u;
@@ -719,6 +730,55 @@ UI_SMALL static void graph_scope(uint16_t c)
     }
 }
 
+#if CLIPPER_SYNTH
+/* BYTE: the formula as a picture, as in METAL KAP 2: rows of 256 steps of t, its bytes through a red heat map, the contrast
+ * stretched to what it really gives; it scrolls with the note that sounds. 80 x 41 cells of 3 px, drawn in the main loop */
+#define BB_VW 80
+#define BB_VH 41
+static uint16_t bb_heat(uint32_t u)                  /* 0..255 */
+{
+    uint32_t r = u * 2u > 255u ? 255u : u * 2u, g = u > 128u ? (u - 128u) * 2u * 141u >> 8 : 0u, b = u > 204u ? (u - 204u) * 5u : 0u;
+    return (uint16_t)((r >> 3) << 11 | (g >> 2) << 5 | (b > 255u ? 255u : b) >> 3);
+}
+UI_SMALL static int bb_sounding(const track_t *t, uint32_t *tv, uint32_t *n)
+{
+    uint32_t i;
+    for (i = 0; i < NVOICE; i++)
+        if (t->v[i].active && t->v[i].stage && t->v[i].stage < 3u) {
+            *tv = t->v[i].ph[1];
+            *n = t->v[i].note;
+            return 1;
+        }
+    return 0;
+}
+static void graph_bytes(void)
+{
+    static uint8_t q[BB_VH][BB_VW];
+    const track_t *t = TSEL;
+    uint32_t prog = (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_N - 1), x, y, base = 8192u, n = 60u, lo = 255u, hi = 0u, sp;
+    uint32_t mask = 0xFFu << (((uint32_t)clamp(t->p[P_E7], 0, 127) * 7u) / 127u);
+    int32_t var[10] = {0};
+    for (x = 0; x < 4u; x++)
+        var[x] = clamp(t->p[P_E1 + x], 0, 127) * 2;
+    if (bb_sounding(t, &base, &n))
+        base &= ~255u;
+    var[9] = (int32_t)n;
+    for (y = 0; y < BB_VH; y++)
+        for (x = 0; x < BB_VW; x++) {
+            uint32_t tt = base + y * 256u + x * 16u / 5u, v;
+            var[8] = (int32_t)tt;
+            v = (uint32_t)bb_run(prog, (int32_t)tt, var) & mask & 255u;
+            q[y][x] = (uint8_t)v;
+            lo = v < lo ? v : lo;
+            hi = v > hi ? v : hi;
+        }
+    sp = hi > lo ? hi - lo : 1u;
+    for (y = 0; y < BB_VH; y++)
+        for (x = 0; x < BB_VW; x++)
+            cv_rect((int32_t)x * 3, (int32_t)y * 3, 3, 3, bb_heat((q[y][x] - lo) * 255u / sp));
+}
+
+#endif
 /* Clipper: HOME, the instrument: the sound's name large, its kind and place in the list, its engine; the
  * scope under it (from the top of the graph strip: cv_oy 0) */
 static uint32_t preset_pos(uint32_t *total);
@@ -882,6 +942,12 @@ UI_SMALL static void draw_graph(void)
             break;
 #endif
         default:
+#if CLIPPER_SYNTH
+            if (pg->scope == SC_ENGINE && TSEL->eng_req == ENGI_BYTE) {
+                cv_oy = 0;
+                graph_bytes();
+            } else
+#endif
             if (big_page(pg)) {
                 cv_oy = 0;
                 graph_big();
