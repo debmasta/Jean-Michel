@@ -320,7 +320,4 @@ static void tw_apply(void)
             tw_kept &= (uint8_t)~8u;
     }
 }
-#else
-static inline void tw_block(uint32_t adv) { (void)adv; }
-#define tw_bend 0
 #endif

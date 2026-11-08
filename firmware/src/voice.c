@@ -1538,7 +1538,11 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
             continue;                                   /* held at a silent sustain (SUS 0): nothing to render */
         {   /* the pitch in 1/4096 semitone: glide, LFO, the pitch envelope; the fraction goes into the increment */
             int32_t q = (v->pitch_cur << 8) + v->pitch_frac + ((lfo * p[P_LD_PIT] * 3) >> 7) +
-                        ((v->penv * p[P_ED_PIT] * 3) >> 7) + bend + ((uint32_t)(t - trk) < NPART ? tw_bend : 0);
+                        ((v->penv * p[P_ED_PIT] * 3) >> 7) + bend
+#if CLIPPER_SYNTH
+                        + ((uint32_t)(t - trk) < NPART ? tw_bend : 0)
+#endif
+                        ;
 #if CLIPPER_SYNTH
             {   /* VIB: up to +-half a semitone */
                 int32_t vd = (p[P_MWDST] == MD_VIB ? mw : 0) + (p[P_ATDST] == MD_VIB ? (e == &ENG_HYBRID ? 0 : v->pat > cat ? v->pat : cat) : 0);

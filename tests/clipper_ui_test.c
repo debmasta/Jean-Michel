@@ -438,9 +438,18 @@ int main(int argc, char **argv)
             fx_buses(ci, di, ri, wl, wr, CTL);
         }
     }
+    {   /* FX held: the twists' window, a key latches one (twist.c) and plays nothing */
+        go_home(); frames(2);
+        press(B_FX); frames(20);
+        fm1_in.notes |= 1u << 9; frames(3);
+        check(ui.layer == LY_FX && tw_mask != 0u && voices_part(0) == 0u, "FX held + a key: the twists' window, the key latches a twist");
+        fm1_in.notes &= ~(1u << 9); frames(2);
+        release(B_FX); frames(3);
+        tw_mask = 0; tw_apply();
+    }
     /* the buttons with no layer: held, the keys play; their pages on release */
     {
-        static const struct { uint32_t b, fam; const char *n; } B[] = {{B_FX, FAM_FX, "FX"}, {B_SAVE, FAM_SAVE, "SAVE"}};
+        static const struct { uint32_t b, fam; const char *n; } B[] = {{B_SAVE, FAM_SAVE, "SAVE"}};
         char what[96];
         for (i = 0; i < NELEM(B); i++) {
             go_home(); frames(2);

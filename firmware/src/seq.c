@@ -3623,8 +3623,8 @@ static void events_block(uint32_t n)
     roll_block(adv);
     for (i = 0; i < (CLIPPER_SYNTH ? 1u : NPART); i++)
         arp_tick(&trk[i], adv);
-    tw_block(adv);                                     /* the twists (twist.c) */
 #if CLIPPER_SYNTH
+    tw_block(adv);                                     /* the twists (twist.c) */
     for (i = 0; i < NPART; i++)
         mseq_tick(&trk[i], adv);                       /* (0.8) the MOD SEQ of both sounds */
 #endif
