@@ -69,7 +69,12 @@ static uint32_t tw_acc, tw_st, tw_ticks, tw_oalt;
 static int32_t tw_deg;
 static uint32_t tw_rand = 0x9E3779B9u;
 static uint32_t tw_rnd(uint32_t n) { tw_rand ^= tw_rand << 13; tw_rand ^= tw_rand >> 17; tw_rand ^= tw_rand << 5; return (tw_rand >> 8) % n; }
-static inline int tw_is(uint32_t k) { return (tw_mask >> k) & 1u; }
+/* MIDI, held from outside (the FM-1 PAD plugin, the game controller): CC 102..115 hold twists 0..13 while >= 64, on top of the
+ * latched ones (the FX window is untouched); CC 116 the stutter's rate, 117 the master filter (64 = open), 119 pitch +-24 */
+static volatile uint32_t tw_cc;
+static uint32_t tw_cc_seen;
+static volatile int32_t tw_cc_semi;
+static inline int tw_is(uint32_t k) { return ((tw_mask | tw_cc) >> k) & 1u; }
 static inline uint32_t tw_v(uint32_t k, uint32_t p) { return tw_p[k][p]; }
 
 static void tw_init(void)
@@ -279,7 +284,7 @@ static void tw_block(uint32_t adv)
         if (tw_is(TW_PUP))
             semis += P[tw_v(TW_PUP, 0)];
     }
-    tw_bend = semis * 4096;
+    tw_bend = (semis + tw_cc_semi) * 4096;
 }
 /* (UI) the twists that are a parameter while they are on: GLIDE THROW FILT SPEED */
 static int16_t tw_keep[4];
@@ -318,6 +323,40 @@ static void tw_apply(void)
         song.g[G_BPM] = tw_is(TW_SPEED) ? (int16_t)clamp(tw_keep[3] * SN[s] / SD[s], GP[G_BPM].min, GP[G_BPM].max) : tw_keep[3];
         if (!tw_is(TW_SPEED))
             tw_kept &= (uint8_t)~8u;
+    }
+}
+/* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
+static int tw_midi_cc(uint32_t cc, uint32_t v)
+{
+    if (cc >= 102u && cc <= 115u) {
+        tw_init();
+        if (v >= 64u)
+            tw_cc |= 1u << (cc - 102u);
+        else
+            tw_cc &= ~(1u << (cc - 102u));
+        return 1;
+    }
+    if (cc == 116u) {
+        tw_init();
+        tw_p[TW_STUT][0] = (uint8_t)(v * 9u / 128u);
+        return 1;
+    }
+    if (cc == 117u) {
+        song.g[G_FILT] = (int16_t)((int32_t)v - 64);
+        return 1;
+    }
+    if (cc == 119u) {
+        tw_cc_semi = ((int32_t)v - 64) * 24 / 63;
+        return 1;
+    }
+    return 0;
+}
+/* (UI, every frame) a held twist that is a parameter comes on or goes off */
+static void tw_poll(void)
+{
+    if (tw_cc != tw_cc_seen) {
+        tw_cc_seen = tw_cc;
+        tw_apply();
     }
 }
 #endif

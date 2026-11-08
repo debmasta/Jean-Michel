@@ -52,6 +52,17 @@ int main(void)
         trk_note_off(&trk[0], 60); tw_mask = 0; run(2000);
         chk("and its note-off finds it", !live());
     }
+    {   /* held from outside: CC 102.. (the FM-1 PAD plugin) */
+        tw_mask = 0; tw_poll();
+        chk("CC 103 holds ROLL", tw_midi_cc(103, 127) && tw_is(TW_ROLL));
+        chk("and lets it go", tw_midi_cc(103, 0) && !tw_is(TW_ROLL));
+        tw_mask = 1u << TW_OCT; tw_midi_cc(102, 127);
+        chk("a latched twist stays when one is held", tw_is(TW_OCT) && tw_is(TW_STUT));
+        tw_midi_cc(102, 0); chk("and after", tw_is(TW_OCT) && !tw_is(TW_STUT)); tw_mask = 0;
+        tw_midi_cc(119, 127); run(10); chk("CC 119: pitch +24", tw_bend == 24 * 4096); tw_midi_cc(119, 64); run(10); chk("CC 119 at 64: none", tw_bend == 0);
+        tw_midi_cc(104 + 8, 127); tw_poll(); chk("a parameter twist held by CC reaches its parameter", song.g[G_FILT] != 0 || tw_is(TW_FDN)); tw_midi_cc(112, 0); tw_poll();
+        tw_midi_cc(102 + TW_THROW, 127); { int16_t d0 = tw_keep[1]; (void)d0; tw_poll(); chk("THROW by CC opens the delay", trk[0].p[P_DLY] > 0); } tw_midi_cc(102 + TW_THROW, 0); tw_poll();
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

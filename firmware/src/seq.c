@@ -3206,6 +3206,10 @@ static void midi_cc(track_t *t, uint32_t cc, uint32_t value)
 {
     int16_t *slot;
     const param_desc_t *d;
+#if CLIPPER_SYNTH
+    if (tw_midi_cc(cc, value))
+        return;
+#endif
     if (!part_ctl_cc(t, cc, value) && (d = cc_target(t, cc, &slot)) != 0)
         *slot = (int16_t)(d->min + ((int32_t)value * (d->max - d->min) + 63) / 127);
 }

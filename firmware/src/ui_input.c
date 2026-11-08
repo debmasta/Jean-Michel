@@ -1065,6 +1065,9 @@ UI_SMALL static void ui_input(void)
     }
     if (!on_notes_page())
         ui.sheet = 0;                                   /* (1.0: the sheet is the NOTES page's) */
+#if CLIPPER_SYNTH
+    tw_poll();
+#endif
     layered = layers_input(notes, &pressed, home);
     if (home_eat && !((fm1_in.buttons >> panel.btn[B_HOME]) & 1u)) {   /* (the HOME that unlocked: let go) */
         if (home == BT_TAP)
