@@ -77,8 +77,10 @@ static volatile int32_t tw_lcut, tw_lshape;      /* BYTE LFO: added to each voic
 static volatile int32_t tw_lfo_a = 128, tw_lfo_b = 128;   /* its a and b (MIDI CC 87, 88: the sticks) */
 #define TW_NH 8u
 static struct { uint8_t in, out, cur, on, vel; uint8_t ai; } tw_h[TW_NH];
-#define TW_NE 12u
-static struct { uint8_t kind, note, vel; int32_t left; } tw_ev[TW_NE];   /* kind 0 none, 1 note on, 2 note off */
+#define TW_NE 24u
+/* an echo of STRUM DELAY, whole: its start and its end together, so one never goes without the other. stage 0 free, 1 waiting
+ * to start, 2 sounding */
+static struct { uint8_t stage, note, vel; int32_t on, off; } tw_ev[TW_NE];
 static uint32_t tw_acc, tw_st, tw_ticks, tw_oalt;
 static int32_t tw_deg;
 static int16_t tw_mut_base[8];
@@ -127,12 +129,30 @@ static int32_t tw_degsemi(int32_t deg, uint32_t sc)
     i = deg - o * n;
     return d[i] + o * 12;
 }
-static void tw_event(uint32_t kind, uint32_t note, uint32_t vel, int32_t left)
+static int tw_sounding(uint32_t note)
+{
+    uint32_t i;
+    for (i = 0; i < TW_NH; i++)
+        if (tw_h[i].on && tw_h[i].cur == note)
+            return 1;
+    return 0;
+}
+/* every voice of the sound in use: an echo would take one from a note you hold (and load the CPU to the limit) */
+static int tw_full(void)
+{
+    const track_t *t = &trk[0];
+    const engine_t *e = ENGINES[t->engine % NENGINES];
+    uint32_t k, n = 0, cap = e->poly && e->poly < NVOICE ? e->poly : NVOICE;
+    for (k = 0; k < NVOICE; k++)
+        n += t->v[k].active != 0;
+    return n >= cap;
+}
+static void tw_echo(uint32_t note, uint32_t vel, int32_t on, int32_t off)
 {
     uint32_t i;
     for (i = 0; i < TW_NE; i++)
-        if (!tw_ev[i].kind) {
-            tw_ev[i].kind = (uint8_t)kind, tw_ev[i].note = (uint8_t)note, tw_ev[i].vel = (uint8_t)vel, tw_ev[i].left = left;
+        if (!tw_ev[i].stage) {
+            tw_ev[i].stage = 1, tw_ev[i].note = (uint8_t)note, tw_ev[i].vel = (uint8_t)vel, tw_ev[i].on = on, tw_ev[i].off = off;
             return;
         }
 }
@@ -179,8 +199,7 @@ static void tw_on(uint32_t note, uint32_t vel)
         for (e = 1; e <= n; e++) {
             int32_t semi = CH[c][e % CN[c]] + (c == 5u ? -12 : 12) * (int32_t)((e / CN[c]) % 3u), o = clamp(m + semi, 0, 127);
             gv = gv * 74u / 100u;
-            tw_event(1, (uint32_t)o, gv ? gv : 1u, iv * (int32_t)e);
-            tw_event(2, (uint32_t)o, 0, iv * (int32_t)e + iv * 85 / 100);
+            tw_echo((uint32_t)o, gv ? gv : 1u, iv * (int32_t)e, iv * (int32_t)e + iv * 85 / 100);
         }
     }
 }
@@ -201,7 +220,7 @@ static void tw_clear(void)
     for (i = 0; i < TW_NH; i++)
         tw_h[i].on = 0;
     for (i = 0; i < TW_NE; i++)
-        tw_ev[i].kind = 0;
+        tw_ev[i].stage = 0;
 }
 /* every held note again: at its own pitch (STUT ROLL), or the next note of the chord (ARP) */
 static void tw_retrig(void)
@@ -304,12 +323,22 @@ static void tw_block(uint32_t adv)
     if (!tw_ready)
         return;
     for (i = 0; i < TW_NE; i++)
-        if (tw_ev[i].kind && (tw_ev[i].left -= (int32_t)adv) <= 0) {
-            if (tw_ev[i].kind == 1u)
-                trk_note_on0(&trk[0], tw_ev[i].note, tw_ev[i].vel);
-            else
-                trk_note_off0(&trk[0], tw_ev[i].note);
-            tw_ev[i].kind = 0;
+        if (tw_ev[i].stage) {
+            tw_ev[i].on -= (int32_t)adv;
+            tw_ev[i].off -= (int32_t)adv;
+            if (tw_ev[i].stage == 1u && tw_ev[i].on <= 0) {
+                if (tw_sounding(tw_ev[i].note) || tw_full())   /* that pitch is held, or no voice free: no echo (never steal) */
+                    tw_ev[i].stage = 0;
+                else {
+                    trk_note_on0(&trk[0], tw_ev[i].note, tw_ev[i].vel);
+                    tw_ev[i].stage = 2;
+                }
+            }
+            if (tw_ev[i].stage == 2u && tw_ev[i].off <= 0) {
+                if (!tw_sounding(tw_ev[i].note))     /* (held since it started: not ours to end) */
+                    trk_note_off0(&trk[0], tw_ev[i].note);
+                tw_ev[i].stage = 0;
+            }
         }
     {
         int32_t iv = 0;

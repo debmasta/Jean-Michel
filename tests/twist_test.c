@@ -83,6 +83,23 @@ int main(void)
         tw_mask = 1u << TW_BLFO; trk_note_on(&trk[0], 48, 100); { int32_t a = 0x7FFFFFFF, b = -a; for (k = 0; k < 200u; k++) { run(8); if (tw_lcut < a) a = tw_lcut; if (tw_lcut > b) b = tw_lcut; } chk("BYTE LFO moves the cutoff", b > a); }
         tw_mask = 0; trk_note_off(&trk[0], 48); run(2000); chk("bounded, no hanging note", bounded() && !live() && (run(10), tw_lcut == 0));
     }
+    {   /* STRUM DELAY under chords: every echo that starts must end, the held notes must stay */
+        uint32_t n, stuck = 0, heldlost = 0;
+        for (n = 0; n < 12u; n++) {
+            quiet(); host_preset(&trk[0], ENGI_BYTE, 0); trk[0].p[P_AMODE] = 0;
+            tw_p[TW_SDL][0] = (uint8_t)(n % 6u); tw_p[TW_SDL][1] = (uint8_t)(n % 5u); tw_p[TW_SDL][2] = 2;
+            tw_mask = 1u << TW_SDL;
+            trk_note_on(&trk[0], 48, 100); run(3); trk_note_on(&trk[0], 52, 100); run(3); trk_note_on(&trk[0], 55, 100); run(3);
+            trk_note_off(&trk[0], 52); run(2); trk_note_off(&trk[0], 55); run(2);
+            trk_note_on(&trk[0], 60, 100); run(1200);
+            { uint32_t g = 0; for (k = 0; k < NVOICE; k++) if (trk[0].v[k].gate && (trk[0].v[k].note == 48u || trk[0].v[k].note == 60u)) g++; if (g < 2u) heldlost++; }
+            trk_note_off(&trk[0], 48); trk_note_off(&trk[0], 60); tw_mask = 0; run(4000);
+            if (live()) stuck++;
+        }
+        tw_p[TW_SDL][2] = 1;
+        chk("STRUM DELAY on chords: no echo left hanging", !stuck);
+        chk("STRUM DELAY: the notes held stay held", !heldlost);
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }
