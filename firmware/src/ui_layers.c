@@ -376,8 +376,11 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
         if (w >= (int32_t)TW_N)
             return;
         ui.layer_used = 1;
-        if (w == TW_ALLOFF) {
+        if (w == TW_ALLOFF) {                           /* everything, wherever it came from: keys, MIDI, the sequencer */
             tw_mask = 0;
+            tw_cc = 0;
+            memset(tw_auto, 0, sizeof tw_auto);
+            tw_auto_now = 0;
         } else if (w == TW_SETA || w == TW_SETB) {      /* the sound as it stands is state A or B of MORPH */
             uint32_t i;
             for (i = 0; i < 5u; i++)
@@ -752,7 +755,7 @@ UI_SMALL static void layer_screen_draw(void)
         str_cpy(sub, tw_sel == TW_CATS ? "cats" : TW_LAB[tw_sel], sizeof sub);
         for (i = 0; i < 16u; i++) {
             uint32_t ti = i + 16u * tw_page;
-            int on = ti >= TW_N ? 0 : ti == TW_CATS ? cats_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_RECCLR ? 0 : (int)((tw_mask >> ti) & 1u);
+            int on = ti >= TW_N ? 0 : ti == TW_CATS ? cats_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_RECCLR ? 0 : tw_is(ti);   /* (lit however it is on: key, MIDI, sequencer) */
             str_cpy(tl[i].lab, ti < TW_N ? TW_LAB[ti] : "", 8);
             tl[i].bg = on ? C_WHITE : TE_G1;
             tl[i].fg = on ? C_BLACK : TE_G4;
