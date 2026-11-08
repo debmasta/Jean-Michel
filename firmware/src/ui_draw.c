@@ -740,6 +740,40 @@ static uint16_t bb_heat(uint32_t u)                  /* 0..255 */
     uint32_t r = u * 2u > 255u ? 255u : u * 2u, g = u > 128u ? (u - 128u) * 2u * 141u >> 8 : 0u, b = u > 204u ? (u - 204u) * 5u : 0u;
     return (uint16_t)((r >> 3) << 11 | (g >> 2) << 5 | (b > 255u ? 255u : b) >> 3);
 }
+/* a full-bright hue, 0..255 round the wheel */
+static uint16_t bb_hue(uint32_t h, uint32_t v)
+{
+    uint32_t s = (h & 255u) * 6u, f = s & 255u, r, g, b;
+    switch (s >> 8) {
+    case 0: r = 255u, g = f, b = 0u; break;
+    case 1: r = 255u - f, g = 255u, b = 0u; break;
+    case 2: r = 0u, g = 255u, b = f; break;
+    case 3: r = 0u, g = 255u - f, b = 255u; break;
+    case 4: r = f, g = 0u, b = 255u; break;
+    default: r = 255u, g = 0u, b = 255u - f; break;
+    }
+    r = r * v >> 8, g = g * v >> 8, b = b * v >> 8;
+    return (uint16_t)((r >> 3) << 11 | (g >> 2) << 5 | b >> 3);
+}
+/* four ways to colour a byte, one per formula round the bank: the palette cycles with the note (ph) */
+static uint16_t bb_color(uint32_t mode, uint32_t u, uint32_t raw, uint32_t x, uint32_t y, uint32_t ph)
+{
+    switch (mode & 3u) {
+    case 0:                                          /* ACID: the byte is a hue, sliding down the rows */
+        return bb_hue(u + y * 3u + ph * 5u, u < 16u ? u * 16u : 255u);
+    case 1: {                                        /* RGB332: the byte IS the colour, bit for bit */
+        uint32_t c = (raw ^ (ph & 0xFFu)) & 255u;
+        return (uint16_t)((c & 0xE0u) << 8 | (c & 0x1Cu) << 6 | (c & 3u) << 3);
+    }
+    case 2: {                                        /* NEON: its set bits choose magenta or cyan or yellow */
+        uint32_t b = raw, n = 0u;
+        for (; b; b &= b - 1u) n++;
+        return bb_hue(n * 32u + 200u + ph * 3u, u < 24u ? 0u : 128u + u / 2u);
+    }
+    default:                                         /* HEAT with checkers that flip on the note */
+        return ((x ^ y ^ (ph >> 2)) & 4u) ? bb_heat(u) : bb_hue(u / 2u + 128u + ph, u);
+    }
+}
 UI_SMALL static int bb_sounding(const track_t *t, uint32_t *tv, uint32_t *n)
 {
     uint32_t i;
@@ -775,7 +809,7 @@ static void graph_bytes(void)
     sp = hi > lo ? hi - lo : 1u;
     for (y = 0; y < BB_VH; y++)
         for (x = 0; x < BB_VW; x++)
-            cv_rect((int32_t)x * 3, (int32_t)y * 3, 3, 3, bb_heat((q[y][x] - lo) * 255u / sp));
+            cv_rect((int32_t)x * 3, (int32_t)y * 3, 3, 3, bb_color(prog, (q[y][x] - lo) * 255u / sp, q[y][x], x, y, base >> 8));
 }
 
 #endif
