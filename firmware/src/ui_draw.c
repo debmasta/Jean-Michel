@@ -794,8 +794,10 @@ static void graph_bytes(void)
     uint32_t prog = (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_N - 1), x, y, base = 8192u, n = 60u, lo = 255u, hi = 0u, sp;
     uint32_t mask = 0xFFu << (((uint32_t)clamp(t->p[P_E7], 0, 127) * 7u) / 127u);
     int32_t var[10] = {0};
-    for (x = 0; x < 4u; x++)
-        var[x] = clamp(t->p[P_E1 + x], 0, 127) * 2;
+    {
+        int32_t cut_unused;
+        bb_knobs(t->p, var, &cut_unused);
+    }
     if (bb_sounding(t, &base, &n))
         base &= ~255u;
     var[9] = (int32_t)n;

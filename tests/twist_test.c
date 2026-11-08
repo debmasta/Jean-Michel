@@ -100,6 +100,20 @@ int main(void)
         chk("STRUM DELAY on chords: no echo left hanging", !stuck);
         chk("STRUM DELAY: the notes held stay held", !heldlost);
     }
+    {   /* MORPH and the sequencer */
+        int32_t var[10], c; int16_t pv[P_COUNT];
+        quiet(); host_preset(&trk[0], ENGI_BYTE, 0);
+        trk[0].p[P_E1] = 10; for (k = 0; k < 5u; k++) bb_snap[0][k] = trk[0].p[P_E1 + k];
+        trk[0].p[P_E1] = 110; for (k = 0; k < 5u; k++) bb_snap[1][k] = trk[0].p[P_E1 + k]; bb_have = 3;
+        trk[0].p[P_E6] = 127; bb_knobs(trk[0].p, var, &c); chk("MORPH at the top: state B", var[0] == 220);
+        tw_midi_cc(24, 1); bb_knobs(trk[0].p, var, &c); chk("CC 24 moves MORPH: near state A", var[0] < 26);
+        tw_midi_cc(24, 64); bb_knobs(trk[0].p, var, &c); chk("halfway: between", var[0] > 100 && var[0] < 130);
+        tw_midi_cc(24, 0); bb_have = 0; tw_midi_cc(20, 64); chk("CC 20 moves A", trk[0].p[P_E1] == 64); (void)pv;
+        memset(tw_auto, 0, sizeof tw_auto); song.playing = 1; song.rec = 1; tw_mask = 1u << TW_ROLL; run(4);
+        { uint32_t st = trk[0].seq_idx % NSTEP; chk("REC writes the latched twist on the step", (tw_auto[st] >> TW_ROLL) & 1u);
+          song.rec = 0; tw_mask = 0; tw_block(0); chk("PLAY plays it back", tw_is(TW_ROLL)); }
+        memset(tw_auto, 0, sizeof tw_auto); song.playing = 0; tw_block(0); chk("stopped: nothing from the sequencer", !tw_is(TW_ROLL));
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

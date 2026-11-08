@@ -7,7 +7,7 @@
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
        TW_ALLOFF, TW_CATS,
        /* page 2 (the first black keys pick the page) */
-       TW_BLFO, TW_TARP, TW_MUT, TW_N };
+       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_N };
 #define TW_NSC 19u
 static const int8_t TW_SC[TW_NSC][13] = {
     {0, 1, 3, 5, 7, 8, 10, -1}, {0, 2, 3, 7, 8, -1}, {0, 2, 4, 6, 8, 10, -1}, {0, 2, 3, 5, 7, 8, 10, -1}, {0, 3, 5, 7, 10, -1},
@@ -61,7 +61,7 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
 static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
@@ -92,7 +92,11 @@ static uint32_t tw_rnd(uint32_t n) { tw_rand ^= tw_rand << 13; tw_rand ^= tw_ran
 static volatile uint32_t tw_cc;
 static uint32_t tw_cc_seen;
 static volatile int32_t tw_cc_semi;
-static inline int tw_is(uint32_t k) { return ((tw_mask | tw_cc) >> k) & 1u; }
+/* the twists written into the sequencer: REC + PLAY stores what is latched on each step, PLAY plays it back ("clr rec" empties it).
+ * RAM only: not saved with the project */
+static uint32_t tw_auto[NSTEP];
+static volatile uint32_t tw_auto_now;
+static inline int tw_is(uint32_t k) { return ((tw_mask | tw_cc | tw_auto_now) >> k) & 1u; }
 static inline uint32_t tw_v(uint32_t k, uint32_t p) { return tw_p[k][p]; }
 
 static void tw_init(void)
@@ -320,6 +324,15 @@ static void tw_block(uint32_t adv)
     int32_t semis = 0;
     bb_Tnow = ((uint64_t)clk_beat << 28) + (((uint64_t)clk_pos << 28) / BEAT_U);
     bb_Tstep = ((uint64_t)(uint32_t)song.g[G_BPM] << 28) / BEAT_U;
+    if (song.playing) {
+        uint32_t st = trk[0].seq_idx % NSTEP;
+        if (song.rec & 1u)
+            tw_auto[st] = tw_mask, tw_auto_now = 0;
+        else
+            tw_auto_now = tw_auto[st];
+    } else {
+        tw_auto_now = 0;
+    }
     if (!tw_ready)
         return;
     for (i = 0; i < TW_NE; i++)
@@ -489,6 +502,12 @@ static int tw_midi_cc(uint32_t cc, uint32_t v)
             tw_cc &= ~(1u << (cc - 102u));
         return 1;
     }
+    if (cc >= 20u && cc <= 24u) {                 /* BYTE: A B C D MORPH, one slider each in Live */
+        if (trk[0].eng_req != ENGI_BYTE)
+            return 0;
+        trk[0].p[P_E1 + (cc == 24u ? 5u : cc - 20u)] = (int16_t)v;
+        return 1;
+    }
     if (cc == 116u) {
         tw_init();
         tw_p[TW_STUT][0] = (uint8_t)(v * 9u / 128u);
@@ -507,8 +526,8 @@ static int tw_midi_cc(uint32_t cc, uint32_t v)
 /* (UI, every frame) a held twist that is a parameter comes on or goes off */
 static void tw_poll(void)
 {
-    if (tw_cc != tw_cc_seen) {
-        tw_cc_seen = tw_cc;
+    if ((tw_cc | tw_auto_now) != tw_cc_seen) {
+        tw_cc_seen = tw_cc | tw_auto_now;
         tw_apply();
     }
 }

@@ -330,6 +330,20 @@ UI_SMALL static void tap_tempo(void)
 }
 
 /* a key of the layers the UI runs (seq.c lk_q): SEQ steps, SEL key, GLO mix */
+#if CLIPPER_SYNTH
+/* a twist latched here goes out as its CC: FM-1 PAD turns it into a parameter, so Live records it */
+static void tw_cc_out(void)
+{
+    static uint32_t sent;
+    uint32_t i, ch = tw_mask ^ sent;
+    for (i = 0; i <= TW_MUT; i++)
+        if (((ch >> i) & 1u) && i != TW_ALLOFF && i != TW_CATS) {
+            uint32_t cc = i < 14u ? 102u + i : i == TW_BLFO ? 118u : i == TW_TARP ? 85u : 86u, q = ((tw_mask >> i) & 1u) ? 127u : 0u;
+            midi_out_event(0x0Bu | (0xB0u | trk_midi_ch(0)) << 8 | cc << 16 | q << 24);
+        }
+    sent = tw_mask;
+}
+#endif
 UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
 {
     int32_t w = punch_key(k);
@@ -364,6 +378,15 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
         ui.layer_used = 1;
         if (w == TW_ALLOFF) {
             tw_mask = 0;
+        } else if (w == TW_SETA || w == TW_SETB) {      /* the sound as it stands is state A or B of MORPH */
+            uint32_t i;
+            for (i = 0; i < 5u; i++)
+                bb_snap[w - TW_SETA][i] = trk[0].p[P_E1 + i];
+            bb_have |= (uint8_t)(1u << (w - TW_SETA));
+            tw_sel = (uint8_t)w;
+        } else if (w == TW_RECCLR) {
+            memset(tw_auto, 0, sizeof tw_auto);
+            tw_sel = (uint8_t)w;
         } else if (w == TW_CATS) {
             if (tw_sel == TW_CATS)
                 cats_on = !cats_on;
@@ -374,6 +397,7 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
             tw_sel = (uint8_t)w;
         }
         tw_apply();
+        tw_cc_out();
         ui.force = 1;
         return;
 #endif
@@ -728,7 +752,7 @@ UI_SMALL static void layer_screen_draw(void)
         str_cpy(sub, tw_sel == TW_CATS ? "cats" : TW_LAB[tw_sel], sizeof sub);
         for (i = 0; i < 16u; i++) {
             uint32_t ti = i + 16u * tw_page;
-            int on = ti >= TW_N ? 0 : ti == TW_CATS ? cats_on : (int)((tw_mask >> ti) & 1u);
+            int on = ti >= TW_N ? 0 : ti == TW_CATS ? cats_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_RECCLR ? 0 : (int)((tw_mask >> ti) & 1u);
             str_cpy(tl[i].lab, ti < TW_N ? TW_LAB[ti] : "", 8);
             tl[i].bg = on ? C_WHITE : TE_G1;
             tl[i].fg = on ? C_BLACK : TE_G4;

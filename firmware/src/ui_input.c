@@ -113,7 +113,7 @@ UI_SMALL static uint32_t keys_lit(void)
 #if CLIPPER_SYNTH
         for (i = 0; i < 16u; i++) {
             uint32_t ti = i + 16u * tw_page;
-            if (ti < TW_N && (ti == TW_CATS ? cats_on : (int)((tw_mask >> ti) & 1u)))
+            if (ti < TW_N && (ti == TW_CATS ? cats_on : ti == TW_SETA || ti == TW_SETB ? (int)((bb_have >> (ti - TW_SETA)) & 1u) : ti == TW_RECCLR ? 0 : (int)((tw_mask >> ti) & 1u)))
                 m |= 1u << key_of_white(i);
         }
         return m;
