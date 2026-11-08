@@ -447,6 +447,19 @@ int main(int argc, char **argv)
         release(B_FX); frames(3);
         tw_mask = 0; tw_apply();
     }
+    {   /* FX held long, let go: the window stays, the keys still latch; FX again closes it */
+        uint32_t t0;
+        go_home(); frames(2);
+        press(B_FX); t0 = fm1_ms; while (fm1_ms - t0 < 1200u) frames(5);
+        release(B_FX); frames(4);
+        check(ui.layer == LY_FX && ly_lock == LY_FX, "FX held long and let go: the twists' window stays open");
+        fm1_in.notes |= 1u << 9; frames(3); fm1_in.notes &= ~(1u << 9); frames(3);
+        check(tw_mask != 0u && ly_lock == LY_FX, "and a key still latches a twist, with no finger on FX");
+        tw_mask = 0; tw_apply();
+        press(B_FX); frames(3); release(B_FX); frames(4);
+        check(ly_lock == LY_PLAY && ui.layer == LY_PLAY, "FX again closes it");
+        go_home(); frames(2);
+    }
     /* the buttons with no layer: held, the keys play; their pages on release */
     {
         static const struct { uint32_t b, fam; const char *n; } B[] = {{B_SAVE, FAM_SAVE, "SAVE"}};

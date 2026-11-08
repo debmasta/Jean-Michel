@@ -849,6 +849,13 @@ UI_SMALL static int layers_input(uint32_t note_edges, uint32_t *pressed, uint32_
         if (!d && down[l] && !used[l] && (now - t0[l] < TAP_MS || !ly_on(l)) && !ui.menu && !ui.confirm)
             layer_tap(l);                                 /* (Clipper: a button with no layer opens its pages
                                                            * on release however long it was held) */
+#if CLIPPER_SYNTH
+        if (!d && down[l] && l == LY_FX && !used[l] && now - t0[l] >= TAP_MS && !ui.menu && !ui.confirm) {
+            ly_lock = LY_FX;                              /* FX held a long moment, nothing touched: the twists stay open
+                                                           * (keys and knobs free); any button but PLAY REC OCT closes */
+            ui.force = 1;
+        }
+#endif
         if (!d && down[l] && l == LY_SONG)
             chain_release();                              /* SAVE let go: the section taps of the hold (ui_layers.c) */
         down[l] = (uint8_t)d;
