@@ -7,7 +7,7 @@
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
        TW_ALLOFF, TW_CATS,
        /* page 2 (the first black keys pick the page) */
-       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_N };
+       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_NUA, TW_N };
 #define TW_NSC 19u
 static const int8_t TW_SC[TW_NSC][13] = {
     {0, 1, 3, 5, 7, 8, 10, -1}, {0, 2, 3, 7, 8, -1}, {0, 2, 4, 6, 8, 10, -1}, {0, 2, 3, 5, 7, 8, 10, -1}, {0, 3, 5, 7, 10, -1},
@@ -40,6 +40,8 @@ static const char *const TN_LRATE[] = {"1/4", "1/8", "1/16", "1/32", "1/64", "FA
 static const char *const TN_LAB[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"};
 static const char *const TN_TSET[] = {"OCTS", "5THS", "DARK", "WIDE"};
 static const char *const TN_MUT[] = {"SOFT", "MID", "WILD"};
+static const char *const TN_NUA[] = {"HAIR", "SOFT", "MID"};
+static const char *const TN_NUM[] = {"FIXED", "EVOLVE", "RND"};
 #define NN(a) (uint8_t)(sizeof(a) / sizeof(a[0]))
 static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_STUT] = {{"rate", NN(TN_STUT), 4, TN_STUT}},
@@ -59,9 +61,10 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_BLFO] = {{"form", 16, 0, TN_LAB}, {"dest", NN(TN_DEST), 0, TN_DEST}, {"depth", NN(TN_DEPTH), 2, TN_DEPTH}, {"speed", NN(TN_LRATE), 2, TN_LRATE}},
     [TW_TARP] = {{"set", NN(TN_TSET), 0, TN_TSET}, {"rate", NN(TN_ARATE), 2, TN_ARATE}},
     [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
+    [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
 static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
@@ -324,6 +327,31 @@ static void tw_block(uint32_t adv)
     int32_t semis = 0;
     bb_Tnow = ((uint64_t)clk_beat << 28) + (((uint64_t)clk_pos << 28) / BEAT_U);
     bb_Tstep = ((uint64_t)(uint32_t)song.g[G_BPM] << 28) / BEAT_U;
+    if (song.playing && tw_ready && tw_is(TW_NUA) && tw_mut_have) {    /* NUANCE: each step of the sequencer, the sound a little elsewhere */
+        static uint32_t last = 0xFFFFFFFFu, loops;
+        uint32_t st = trk[0].seq_idx % NSTEP;
+        if (st != last) {
+            static const uint8_t R[3] = {3, 7, 14};
+            const engine_t *e = ENGINES[trk[0].engine % NENGINES];
+            uint32_t k, a = R[tw_v(TW_NUA, 0)], md = tw_v(TW_NUA, 1);
+            if (st < last)
+                loops++;
+            last = st;
+            for (k = 0; k < 8u; k++) {
+                const param_desc_t *d = &e->edit[k];
+                uint32_t h;
+                if (d->names || d->max <= d->min)
+                    continue;
+                h = (st + 1u) * 2654435761u ^ (k + 1u) * 40503u;
+                if (md == 1u)
+                    h ^= (loops / 2u) * 2246822519u;      /* EVOLVE: another set every two loops */
+                else if (md == 2u)
+                    h = tw_rnd(0xFFFFFFFEu);
+                h ^= h >> 13;
+                trk[0].p[P_E0 + k] = (int16_t)clamp(tw_mut_base[k] + (int32_t)((h * 2654435761u >> 16) % (2u * a + 1u)) - (int32_t)a, d->min, d->max);
+            }
+        }
+    }
     if (song.playing) {
         uint32_t st = trk[0].seq_idx % NSTEP;
         if (song.rec & 1u)
@@ -447,12 +475,12 @@ static void tw_apply(void)
         if (!tw_is(TW_GLIDE))
             tw_kept &= (uint8_t)~1u;
     }
-    if (tw_is(TW_MUT) && !tw_mut_have) {         /* MUTATE: the sound as it is, given back when it ends */
+    if ((tw_is(TW_MUT) || tw_is(TW_NUA)) && !tw_mut_have) {         /* MUTATE: the sound as it is, given back when it ends */
         uint32_t k;
         for (k = 0; k < 8u; k++)
             tw_mut_base[k] = t->p[P_E0 + k];
         tw_mut_have = 0xFFu;
-    } else if (!tw_is(TW_MUT) && tw_mut_have) {
+    } else if (!tw_is(TW_MUT) && !tw_is(TW_NUA) && tw_mut_have) {
         uint32_t k;
         tw_mut_have = 0;
         for (k = 0; k < 8u; k++)
@@ -484,8 +512,8 @@ static void tw_apply(void)
 /* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
 static int tw_midi_cc(uint32_t cc, uint32_t v)
 {
-    if (cc == 85u || cc == 86u || cc == 118u) {   /* the page 2 twists held: 118 BYTE LFO, 85 TRIPLE ARP, 86 MUTATE */
-        uint32_t b = 1u << (cc == 118u ? TW_BLFO : cc == 85u ? TW_TARP : TW_MUT);
+    if (cc == 85u || cc == 86u || cc == 118u || cc == 84u) {   /* the page 2 twists held: 118 BYTE LFO, 85 TRIPLE ARP, 86 MUTATE */
+        uint32_t b = 1u << (cc == 118u ? TW_BLFO : cc == 85u ? TW_TARP : cc == 84u ? TW_NUA : TW_MUT);
         tw_init();
         if (v >= 64u) tw_cc |= b; else tw_cc &= ~b;
         return 1;

@@ -800,6 +800,7 @@ static const struct { uint8_t kind, e; const char *name; } BANK[] = {
     {BK_PAD, 4, "SAW ENSEMBLE"}, {BK_LEAD, 4, "AIR FLUTE"},
     /* METAL KAP 2: bytebeat (appended: the favourites keep their places) */
     {BK_FX, ENGI_BYTE, "BB 42 MELODY"}, {BK_FX, ENGI_BYTE, "BB SIERPINSKI"}, {BK_FX, ENGI_BYTE, "BB NEUROFUNK"}, {BK_FX, ENGI_BYTE, "BB CROWD"}, {BK_FX, ENGI_BYTE, "BB STEPS"}, {BK_FX, ENGI_BYTE, "BB MELODIE"}, {BK_FX, ENGI_BYTE, "BB METAL"}, {BK_FX, ENGI_BYTE, "BB DUB"}, {BK_FX, ENGI_BYTE, "BB BREAK"}, {BK_FX, ENGI_BYTE, "BB ARP"}, {BK_FX, ENGI_BYTE, "BB GLITCH"}, {BK_FX, ENGI_BYTE, "BB STAIRS"}, {BK_FX, ENGI_BYTE, "BB PWM"}, {BK_FX, ENGI_BYTE, "BB HISS"}, {BK_FX, ENGI_BYTE, "BB KICK LOOP"}, {BK_FX, ENGI_BYTE, "BB HARMONICS"},
+    {BK_FX, ENGI_BYTE, "BP KICK"}, {BK_FX, ENGI_BYTE, "BP SNARE"}, {BK_FX, ENGI_BYTE, "BP HAT"}, {BK_FX, ENGI_BYTE, "BP CLAP"}, {BK_FX, ENGI_BYTE, "BP TOM"}, {BK_FX, ENGI_BYTE, "BP RIM"}, {BK_FX, ENGI_BYTE, "BP ZAP"}, {BK_FX, ENGI_BYTE, "BP METAL HIT"},
 #endif
 };
 #define NBANK (sizeof BANK / sizeof BANK[0])

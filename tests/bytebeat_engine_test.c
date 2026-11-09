@@ -27,7 +27,7 @@ int main(int argc, char **argv)
         r = rms_l(0, ncap);
         printf("  %-16s rms %7.0f\n", en->presets[pi].name, r);
         if (!bounded()) b = 0;
-        if (r < 300.0) l = 0;
+        if (r < (en->presets[pi].name[1] == 'P' ? 150.0 : 300.0)) l = 0;    /* (BP: short hits, the measure is mostly silence) */
         if (f) {
             uint32_t bl;
             for (bl = 0; bl < 6u; bl++) {

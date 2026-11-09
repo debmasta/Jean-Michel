@@ -125,6 +125,20 @@ int main(void)
           song.rec = 0; tw_mask = 0; tw_block(0); chk("PLAY plays it back", tw_is(TW_ROLL)); }
         memset(tw_auto, 0, sizeof tw_auto); song.playing = 0; tw_block(0); chk("stopped: nothing from the sequencer", !tw_is(TW_ROLL));
     }
+    {   /* NUANCE on the sequencer */
+        int16_t e[8]; int16_t got[2]; int moved = 0;
+        quiet(); host_preset(&trk[0], 0u, 0);
+        for (k = 0; k < 8u; k++) e[k] = trk[0].p[P_E0 + k];
+        tw_p[TW_NUA][1] = 0; tw_mask = 1u << TW_NUA; tw_apply();
+        song.playing = 1; song.rec = 0; trk[0].seq_idx = 3; tw_block(0);
+        for (k = 0; k < 8u; k++) moved |= trk[0].p[P_E0 + k] != e[k];
+        chk("NUANCE moves the sound on a step", moved);
+        got[0] = trk[0].p[P_E1]; trk[0].seq_idx = 4; tw_block(0); trk[0].seq_idx = 3; tw_block(0); got[1] = trk[0].p[P_E1];
+        chk("FIXED: a step keeps its own nuance", got[0] == got[1]);
+        { int small = 1; for (k = 0; k < 8u; k++) { const param_desc_t *d = &ENGINES[trk[0].engine]->edit[k]; if (!d->names && d->max > d->min) small &= abs(trk[0].p[P_E0 + k] - e[k]) <= 7; } chk("and stays subtle", small); }
+        song.playing = 0; tw_mask = 0; tw_apply();
+        { int same = 1; for (k = 0; k < 8u; k++) same &= trk[0].p[P_E0 + k] == e[k]; chk("off: the sound comes back exactly", same); }
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-struct F { const char* name; const char* preset; const char* src; };
+struct F { const char* name; const char* preset; const char* src; int dec = 70, sus = 127; };
 // every knob at noon (128) is the original formula; C and D are common to all: C an xor ramp, D a tempo-stepped offset
 #define W(f) f   /* C and D are applied by the firmware itself (bb_eval), lighter than in the program */
 static const F BANK[] = {
@@ -26,6 +26,15 @@ static const F BANK[] = {
     {"HISS", "BB HISS", W("t*t*(t+b-128)>>(a>>4)")},
     {"KICK", "BB KICK LOOP", W("(a*255e3/128/(1+(T&4095))&255)|(T>>10&b)")},
     {"HARM", "BB HARMONICS", W("t*(a&T>>(b>>4)+2)/8")},
+    // percussive: t starts at 0 with the note, so the formula is the hit; A the tone, B the colour; short envelopes
+    {"BDRUM", "BP KICK", "(a*15625/(t+400))&(b+127)", 32, 0},
+    {"SNARE", "BP SNARE", "(t*t*(t+1)>>(a>>5)&b+127)^t*3&64", 22, 0},
+    {"HAT", "BP HAT", "t*t*t*t>>(a>>4)&b|64", 10, 0},
+    {"CLAP", "BP CLAP", "(t*t*t>>(a>>5)&b+127)&(t<300|t>600&t<900|t>1200)*255", 26, 0},
+    {"TOM", "BP TOM", "(a*4000/(t+300))&255^t*(b>>5)&32", 30, 0},
+    {"RIM", "BP RIM", "(t*(a>>1)&128)*(t<600)^t*(b>>4)&(t<300)*64", 12, 0},
+    {"ZAP", "BP ZAP", "t*(1e3-t/4)>>(a>>5)&b+127", 24, 0},
+    {"PING", "BP METAL HIT", "(t*3^t*5^t*7)&(b+127)*(t<3000)", 34, 0},
 };
 int main() {
     std::vector<int> ops, args; std::string strs; std::vector<int> off, len; int maxDepth = 0;
@@ -52,6 +61,6 @@ int main() {
     puts("#ifdef BB_WITH_SRC\nstatic const char *const BB_SRC[BB_N] = {");
     for (const F& f : BANK) { fputc('"', stdout); for (const char* q = f.src; *q; ++q) { if (*q == '"' || *q == '\\') fputc('\\', stdout); fputc(*q, stdout); } puts("\","); }
     puts("};\n#endif");
-    puts("#define BB_PRESET_LIST(X) \\"); int i = 0; for (const F& f : BANK) printf("    X(%d, \"%s\")%s\n", i++, f.preset, i < (int)(sizeof BANK / sizeof *BANK) - 0 ? " \\" : ""); 
+    puts("#define BB_PRESET_LIST(X) \\"); int i = 0; for (const F& f : BANK) printf("    X(%d, \"%s\", %d, %d)%s\n", i++, f.preset, f.dec, f.sus, i < (int)(sizeof BANK / sizeof *BANK) - 0 ? " \\" : ""); 
     return 0;
 }
