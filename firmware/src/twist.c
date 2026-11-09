@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* TWISTS (from METAL KAP 2): FX held, the 16 white keys latch the twists on and off and pick the one KNOBS 1..3 edit; let go
  * and every note played (keys, sequencer, arp, MIDI) goes through them. They act on notes, not on the audio: nothing here
- * takes RAM from the synth. Key 15 lets everything go, key 16 is the cats (ui_draw.c).
+ * takes RAM from the synth. Key 15 lets everything go, key 16 is the screen flashes (ui_draw.c).
  * Runs in the audio ISR (tw_on, tw_off, tw_block) except the parts that change a parameter (tw_apply, the UI). */
 #if CLIPPER_SYNTH
 static uint8_t tw_last_on, tw_last_n, tw_last_v;   /* last note played: what FOOTWORK and POLY cut up while the sequencer runs */
@@ -72,16 +72,12 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "flash", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
 static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
 static uint8_t tw_p[TW_N][TW_NP];
 static uint8_t tw_ready;
-/* the cats: ON, and their four knobs */
-static volatile uint8_t cat_w;                   /* notes for the UI's cats (written here, read by ui_draw.c) */
-static volatile uint8_t cat_q[8];
-static uint8_t cat_size = 2, cat_form, cat_life = 3, cat_pal = 4;   /* (cat_pal 4: a palette per cat) */
 
 static volatile int32_t tw_bend;                 /* 1/4096 semitone, read by voice.c */
 static volatile int32_t tw_lcut, tw_lshape;      /* BYTE LFO: added to each voice's cutoff, shape (0..127 << 8 scale) */
@@ -179,9 +175,6 @@ static void tw_on(uint32_t note, uint32_t vel)
     int32_t m = (int32_t)note;
     uint32_t i;
     tw_last_on = 1, tw_last_n = (uint8_t)note, tw_last_v = (uint8_t)vel;
-    cat_q[cat_w & 7u] = (uint8_t)note;
-    RING_PUBLISH();
-    cat_w++;
     if (tw_is(TW_MUT)) {                         /* MUTATE: this note, the sound's numbers thrown around where they are */
         static const uint8_t R[3] = {10, 28, 64};
         const engine_t *e = ENGINES[t->engine % NENGINES];

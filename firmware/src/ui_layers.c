@@ -392,7 +392,7 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
             tw_sel = (uint8_t)w;
         } else if (w == TW_CATS) {
             if (tw_sel == TW_CATS)
-                cats_on = !cats_on;
+                fl_on = !fl_on;
             tw_sel = TW_CATS;
         } else {
             if (tw_sel == (uint32_t)w || !((tw_mask >> w) & 1u))
@@ -558,13 +558,7 @@ UI_SMALL static void layer_knobs(uint32_t layer)
         case LY_FX:
 #if CLIPPER_SYNTH
             tw_init();
-            if (tw_sel == TW_CATS) {
-                if (k == 0u) cat_size = (uint8_t)clamp((int32_t)cat_size + s, 1, 5);
-                else if (k == 1u) cat_form = (uint8_t)clamp((int32_t)cat_form + s, 0, (int32_t)BB_N - 1);
-                else if (k == 2u) cat_life = (uint8_t)clamp((int32_t)cat_life + s, 0, 7);
-                else cat_pal = (uint8_t)clamp((int32_t)cat_pal + s, 0, 4);
-                cat_w_preview();
-            } else if (k < TW_NP && TW_PAR[tw_sel][k].n) {
+            if (k < TW_NP && TW_PAR[tw_sel][k].n) {
                 tw_p[tw_sel][k] = (uint8_t)clamp((int32_t)tw_p[tw_sel][k] + s, 0, TW_PAR[tw_sel][k].n - 1);
                 tw_apply();
             }
@@ -752,21 +746,16 @@ UI_SMALL static void layer_screen_draw(void)
 #if CLIPPER_SYNTH
         tw_init();
         col = TE_RED;
-        str_cpy(sub, tw_sel == TW_CATS ? "cats" : TW_LAB[tw_sel], sizeof sub);
+        str_cpy(sub, TW_LAB[tw_sel], sizeof sub);
         for (i = 0; i < 16u; i++) {
             uint32_t ti = i + 16u * tw_page;
-            int on = ti >= TW_N ? 0 : ti == TW_CATS ? cats_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_RECCLR ? 0 : tw_is(ti);   /* (lit however it is on: key, MIDI, sequencer) */
+            int on = ti >= TW_N ? 0 : ti == TW_CATS ? fl_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_RECCLR ? 0 : tw_is(ti);   /* (lit however it is on: key, MIDI, sequencer) */
             str_cpy(tl[i].lab, ti < TW_N ? TW_LAB[ti] : "", 8);
             tl[i].bg = on ? C_WHITE : TE_G1;
             tl[i].fg = on ? C_BLACK : TE_G4;
             tl[i].top = ti == tw_sel ? TE_RED : TE_DIM[i / 4u];
         }
-        if (tw_sel == TW_CATS) {
-            static const char *const PN[5] = {"ACID", "RGB", "NEON", "HEAT", "MIX"};
-            lab[0] = "size", lab[1] = "form", lab[2] = "life", lab[3] = "color";
-            fmt_int(v[0], cat_size); str_cpy(v[1], N_BB[cat_form], 8); fmt_int(v[2], cat_life); str_cpy(v[3], PN[cat_pal], 8);
-            ratio[0] = cat_size * 200, ratio[1] = cat_form * 1000 / ((int32_t)BB_N - 1), ratio[2] = cat_life * 1000 / 7, ratio[3] = cat_pal * 250;
-        } else {
+        {
             uint32_t kp;
             for (kp = 0; kp < 4u; kp++) {
                 const tw_par_t *pa = kp < TW_NP ? &TW_PAR[tw_sel][kp] : 0;
