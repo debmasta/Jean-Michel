@@ -20,6 +20,7 @@ static uint64_t bb_Tnow, bb_Tstep;
  * the knob glides through those stored, 1 the first .. 127 the last. At 0, or with fewer than two stored, the knobs as they stand */
 static int16_t bb_snap[4][5];
 static uint8_t bb_have;
+static volatile uint8_t bb_force;   /* CC 25 (the "BYTE MEM" list in Live): 0 none, 1..4 play that memory as it is, if it is stored */
 static inline void bb_knobs(const int16_t *p, int32_t *var, int32_t *cut)
 {
     int32_t m = clamp(p[P_E6], 0, 127), i, n = 0, span, seg, fr;
@@ -34,7 +35,9 @@ static inline void bb_knobs(const int16_t *p, int32_t *var, int32_t *cut)
         seg = n > 1 ? n - 2 : 0, fr = 126;
     for (i = 0; i < 5; i++) {
         int32_t v = clamp(p[P_E1 + i], 0, 127);
-        if (m > 0 && n >= 2)
+        if (bb_force && ((bb_have >> (bb_force - 1u)) & 1u))
+            v = bb_snap[bb_force - 1u][i];
+        else if (m > 0 && n >= 2)
             v = (bb_snap[idx[seg]][i] * (126 - fr) + bb_snap[idx[seg + 1]][i] * fr) / 126;
         if (i < 4)
             var[i] = v * 2;

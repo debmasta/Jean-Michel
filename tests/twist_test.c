@@ -114,6 +114,11 @@ int main(void)
         trk[0].p[P_E6] = 43; bb_knobs(trk[0].p, var, &c); chk("43 is B", var[0] == 80);
         trk[0].p[P_E6] = 85; bb_knobs(trk[0].p, var, &c); chk("85 is C", var[0] == 160);
         trk[0].p[P_E6] = 127; bb_knobs(trk[0].p, var, &c); chk("127 is D", var[0] == 240);
+        trk[0].p[P_E6] = 20;
+        tw_midi_cc(25, 95); bb_knobs(trk[0].p, var, &c); chk("CC 25 at 95 plays memory C", var[0] == 160);
+        tw_midi_cc(25, 127); bb_knobs(trk[0].p, var, &c); chk("CC 25 at 127 plays memory D", var[0] == 240);
+        bb_have = 3; tw_midi_cc(25, 95); bb_knobs(trk[0].p, var, &c); chk("an empty memory plays nothing special", var[0] != 160);
+        bb_have = 15; tw_midi_cc(25, 0); bb_knobs(trk[0].p, var, &c); chk("CC 25 at 0: back to MORPH", var[0] != 160 && var[0] != 240);
         trk[0].p[P_E6] = 0; bb_have = 0;
         memset(tw_auto, 0, sizeof tw_auto); song.playing = 1; song.rec = 1; tw_mask = 1u << TW_ROLL; run(4);
         { uint32_t st = trk[0].seq_idx % NSTEP; chk("REC writes the latched twist on the step", (tw_auto[st] >> TW_ROLL) & 1u);

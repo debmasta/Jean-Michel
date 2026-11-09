@@ -508,6 +508,10 @@ static int tw_midi_cc(uint32_t cc, uint32_t v)
         trk[0].p[P_E1 + (cc == 24u ? 5u : cc - 20u)] = (int16_t)v;
         return 1;
     }
+    if (cc == 25u) {                              /* BYTE: which memory plays: 0 none, then A B C D */
+        bb_force = (uint8_t)(v * 5u / 128u);
+        return 1;
+    }
     if (cc == 116u) {
         tw_init();
         tw_p[TW_STUT][0] = (uint8_t)(v * 9u / 128u);
