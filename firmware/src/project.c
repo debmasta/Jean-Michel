@@ -624,6 +624,48 @@ UI_SMALL static const int8_t *proj_x10_of(const project_t *p)   /* p's 1.0 block
         return p->t[2].micro;
     return proj_x10_valid(x) && x->sum == p->sum ? x->m : 0;
 }
+#ifndef PROJ_HOST
+/* Jean-Michel: the BYTE memories A..D and VOICE 4 beside each project, in RAM as the 1.0 block is, in flash after it in the side record
+ * (an older save: nothing there, erased or stale, the check refuses it and the project plays with empty memories) */
+#define JM_MAGIC 0x314D4A50u                         /* "PJM1" */
+typedef struct {
+    uint32_t magic, sum;
+    uint8_t snap[4][5], have, rsv[3];
+    uint8_t flam[NPART], stack[NPART], grnd[NPART], drift[NPART];
+    uint32_t chk;
+} proj_jm_t;
+static proj_jm_t proj_jms[PROJ_X10_N] __attribute__((section(".pool")));
+UI_SMALL static int proj_jm_valid(const proj_jm_t *j) { return j->magic == JM_MAGIC && j->chk == proj_hash(j, sizeof *j - 4u); }
+UI_SMALL static void proj_jm_fill(proj_jm_t *j, uint32_t sum)
+{
+    uint32_t a, b;
+    memset(j, 0, sizeof *j);
+    j->magic = JM_MAGIC, j->sum = sum, j->have = bb_have;
+    for (a = 0; a < 4u; a++)
+        for (b = 0; b < 5u; b++)
+            j->snap[a][b] = (uint8_t)clamp(bb_snap[a][b], 0, 127);
+    memcpy(j->flam, vt_flam, NPART), memcpy(j->stack, vt_stack, NPART), memcpy(j->grnd, vt_grnd, NPART), memcpy(j->drift, vt_drift, NPART);
+    j->chk = proj_hash(j, sizeof *j - 4u);
+}
+UI_SMALL static void proj_jm_apply(const project_t *p)   /* a project put in place by hand or at power-on: its own, or none */
+{
+    const proj_jm_t *j = &proj_jms[proj_x10_at(p)];
+    uint32_t a, b;
+    if (!proj_jm_valid(j) || j->sum != p->sum) {
+        bb_have = 0;
+        memset(vt_flam, 0, NPART), memset(vt_stack, 0, NPART), memset(vt_grnd, 0, NPART), memset(vt_drift, 0, NPART);
+        return;
+    }
+    bb_have = j->have & 15u;
+    for (a = 0; a < 4u; a++)
+        for (b = 0; b < 5u; b++)
+            bb_snap[a][b] = j->snap[a][b];
+    for (a = 0; a < NPART; a++) {
+        vt_flam[a] = (uint8_t)(j->flam[a] & 127u), vt_stack[a] = (uint8_t)(j->stack[a] & 3u);
+        vt_grnd[a] = (uint8_t)(j->grnd[a] & 127u), vt_drift[a] = (uint8_t)(j->drift[a] & 127u);
+    }
+}
+#endif
 #ifdef PROJ_HOST
 static uint32_t proj_x10_at(const project_t *p)      /* (host tests: the slots, else 4) */
 {
@@ -680,6 +722,9 @@ UI_SMALL static void proj_capture(project_t *p)        /* what is playing now, a
         proj_x10_t *x = &proj_x10s[proj_x10_at(p)];
         proj_x10_fill(x->m);
         proj_x10_seal(x, p->sum);
+#ifndef PROJ_HOST
+        proj_jm_fill(&proj_jms[proj_x10_at(p)], p->sum);
+#endif
     }
 #endif
 }
@@ -840,6 +885,9 @@ UI_SMALL static void project_apply(const project_t *p)
     panic_req = (1u << NTRK) - 1u;
     fm1_irq_off();                                      /* the audio ISR must not see half a project */
     proj_apply(p, 1);
+#if CLIPPER_SYNTH && !defined(PROJ_HOST)
+    proj_jm_apply(p);
+#endif
     part_ctl_reset();                                   /* (the wheels back to the middle, the pedal up) */
     song.sel = (uint8_t)(p->sel < NTRK && !CLIPPER_SYNTH ? p->sel : 0u);
     fm1_irq_on();
@@ -894,8 +942,16 @@ UI_SMALL static uint32_t proj_sig(const project_t *p)
 {
 #if CLIPPER_SYNTH
     const proj_x10_t *x = &proj_x10s[proj_x10_at(p)];
+#ifndef PROJ_HOST
+    {
+        const proj_jm_t *j = &proj_jms[proj_x10_at(p)];
+        uint32_t jc = proj_jm_valid(j) && j->sum == p->sum ? j->chk * 31u : 0u;
+        return p->sum ^ (proj_x10_valid(x) && x->sum == p->sum ? x->chk : 0u) ^ jc;
+    }
+#else
     if (proj_x10_valid(x) && x->sum == p->sum)
         return p->sum ^ x->chk;
+#endif
 #endif
     return p->sum;
 }
@@ -905,8 +961,20 @@ UI_SMALL static int proj_st_save(uint32_t obj, const project_t *p)
     int rc;
 #if CLIPPER_SYNTH
     const proj_x10_t *x = &proj_x10s[proj_x10_at(p)];
+#ifndef PROJ_HOST
+    const proj_jm_t *j = &proj_jms[proj_x10_at(p)];
+    struct { proj_x10_t x; proj_jm_t j; } both;
+    _Static_assert(sizeof both <= ST_SIDE_MAX, "the side record of a project");
+    int xok = proj_x10_valid(x) && x->sum == p->sum, jok = proj_jm_valid(j) && j->sum == p->sum;
+    memset(&both, 0, sizeof both);
+    if (xok) both.x = *x;
+    if (jok) both.j = *j;
+    st_side = xok || jok ? &both : 0;
+    st_side_len = sizeof both;
+#else
     st_side = proj_x10_valid(x) && x->sum == p->sum ? x : 0;
     st_side_len = sizeof *x;
+#endif
 #endif
     rc = st_save(obj, p, sizeof *p);
     st_side = 0;
@@ -935,6 +1003,16 @@ UI_SMALL static void proj_x10_load(uint32_t obj, const project_t *q)
         *y = x;
     else if (!proj_x10_valid(y) || y->sum != q->sum)
         memset(y, 0, sizeof *y);
+#ifndef PROJ_HOST
+    {
+        struct { proj_x10_t x; proj_jm_t j; } both;
+        proj_jm_t *z = &proj_jms[proj_x10_at(q)];
+        if (st_side_load(obj, &both, sizeof both) == 0 && proj_jm_valid(&both.j) && both.j.sum == q->sum)
+            *z = both.j;
+        else if (!proj_jm_valid(z) || z->sum != q->sum)
+            memset(z, 0, sizeof *z);
+    }
+#endif
 #else
     (void)obj, (void)q;
 #endif
@@ -984,6 +1062,9 @@ UI_SMALL static void autosave_resume(void)              /* power-on: the project
     proj_x10_load(OBJ_AUTOSAVE, q);                    /* (after Clipper 1.2) its 1.0 block */
     autosave_hash = proj_sig(q);
     proj_apply(q, 1);
+#if CLIPPER_SYNTH && !defined(PROJ_HOST)
+    proj_jm_apply(q);
+#endif
     song.sel = (uint8_t)(q->sel < NTRK && !CLIPPER_SYNTH ? q->sel : 0u);
     for (n = 0; n < NPART; n++)
         trk[n].engine = trk[n].eng_req;        /* (nothing sounds yet: no fade) */
