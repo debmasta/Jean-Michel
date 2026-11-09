@@ -1277,10 +1277,76 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
 }
 
 /* main loop: editor frames first; anything else stays for ota_service() */
+#if CLIPPER_SYNTH
+/* the formulas of FM-1 PAD: F0 7D 4A 4D 42 slot n nstr, n x (op, arg in five 7-bit groups), nstr x (two nibbles) F7. The last flash sector
+ * below the settings holds them, one copy */
+#define BBU_MAGIC 0x31554242u
+#define BBU_OFF 0xFB000u
+static uint8_t bbu_dirty, bbu_loaded;
+UI_SMALL static void bbu_load(void)
+{
+    static uint32_t h[2];
+    if (bbu_loaded || !flash_ok)
+        return;
+    bbu_loaded = 1;
+    if (st_read(BBU_OFF, h, sizeof h) || h[0] != BBU_MAGIC)
+        return;
+    if (!st_read(BBU_OFF + 8u, bb_user, sizeof bb_user) && st_crc32(bb_user, sizeof bb_user) == h[1])
+        return;
+    memset(bb_user, 0, sizeof bb_user);
+}
+UI_SMALL static void bbu_save(void)
+{
+    static uint32_t h[2];
+    _Static_assert(sizeof bb_user + 8u <= 4096u, "one sector");
+    bbu_dirty = 0;
+    h[0] = BBU_MAGIC, h[1] = st_crc32(bb_user, sizeof bb_user);
+    if (st_erase(BBU_OFF) || st_prog(BBU_OFF, h, sizeof h) || st_prog(BBU_OFF + 8u, bb_user, sizeof bb_user))
+        ui_message("U SAVE ERROR");
+}
+UI_SMALL static int bbu_rx(const uint8_t *p, uint32_t len)
+{
+    static uint8_t op[BB_UOPS], str[BB_USTR];
+    static int32_t arg[BB_UOPS];
+    static bb_user_t u;
+    uint32_t slot = p[4], n = p[5], ns = p[6], i;
+    if (len != 7u + 6u * n + 2u * ns || n > BB_UOPS || ns > BB_USTR || slot >= BB_NU)
+        return 0;
+    for (i = 0; i < n; i++) {
+        const uint8_t *q = p + 7u + 6u * i;
+        op[i] = q[0];
+        arg[i] = (int32_t)((uint32_t)q[1] | (uint32_t)q[2] << 7 | (uint32_t)q[3] << 14 | (uint32_t)q[4] << 21 | (uint32_t)q[5] << 28);
+    }
+    for (i = 0; i < ns; i++)
+        str[i] = (uint8_t)(p[7u + 6u * n + 2u * i] << 4 | (p[8u + 6u * n + 2u * i] & 15u));
+    if (!bb_install(slot, op, arg, n, str, ns, &u))
+        return 0;
+    fm1_irq_off();
+    bb_user[slot] = u;
+    if (trk[0].eng_req == ENGI_BYTE)
+        trk[0].p[P_E0] = (int16_t)(BB_N + slot);          /* hear it at once */
+    fm1_irq_on();
+    bbu_dirty = 1;
+    return 1;
+}
+#endif
 UI_SMALL static void ed_service(void)
 {
     const uint8_t *p;
     uint32_t n;
+#if CLIPPER_SYNTH
+    bbu_load();
+    if (bbu_dirty && flash_ok && !song.playing && !transport_req)
+        bbu_save();                                         /* (a sector erase stops the audio for ~50 ms: never while it plays) */
+    if (ota_frame_get(&p, &n) && n >= 7u && p[0] == 0x7Du && p[1] == 0x4Au && p[2] == 0x4Du && p[3] == 0x42u) {
+        char m[16];
+        str_cpy(m, "U1 OK", sizeof m);
+        m[1] = (char)('1' + p[4] % BB_NU);
+        ui_message(bbu_rx(p, n) ? m : "FORMULA BAD");
+        ota_frame_done();
+        return;
+    }
+#endif
     ed_sync();                                             /* v2 pushes (while watched) */
     if (!ota_frame_get(&p, &n) || n < 4u || p[0] != ED_HDR0 || p[1] != ED_HDR1 || p[2] != ED_HDR2)
         return;

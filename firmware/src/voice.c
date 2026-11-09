@@ -288,6 +288,7 @@ static int32_t glide_ticks(int32_t g)                    /* control ticks of TIM
 #if CLIPPER_SYNTH
 /* EDIT > VOICE 4, per part: FLAM (UNISON's voices start one after the other), STACK (every other unison voice up an octave / a fifth),
  * GLIDE RND (only some notes glide), DRIFT (each voice's pitch wanders by itself). No voice more than the part already uses */
+static uint8_t rmx_drop;                                 /* REMIX (twist.c): the notes a moment dropped: 1 the melodic parts, 2 the drums too */
 static uint8_t vt_flam[NPART], vt_stack[NPART], vt_grnd[NPART], vt_drift[NPART];
 static uint32_t vt_tick;                                 /* control blocks (twist.c tw_block) */
 static struct { uint8_t left, note, vel, glide; } vt_fl[NPART][NVOICE];
@@ -645,6 +646,10 @@ static void trk_note_on1(track_t *t, uint32_t note, uint32_t vel)
     uint32_t any = 0, i, mode = voice_mode(t);
     if (trk_silent(t))
         return;                                         /* MUTE, or another track soloed */
+#if CLIPPER_SYNTH
+    if (rmx_drop > 1u || (rmx_drop && !is_drum(t)))
+        return;
+#endif
     vis_hit |= (uint8_t)(1u << ((uint32_t)(t - trk) & 3u));
     vis_note[(uint32_t)(t - trk) & 3u] = (uint8_t)note;
     if (is_drum(t)) {                                   /* the drum track: GM drums (drums.c) */

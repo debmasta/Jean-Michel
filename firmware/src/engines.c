@@ -68,6 +68,7 @@ static uint32_t uni_turns(uint32_t r, int32_t p16, int32_t d16)
 #include "eng_wseq.c"           /* WSEQ: wave sequencing (Clipper 0.6) */
 #include "eng_juno.c"           /* JUNO: the Juno poly, its chorus in fx.c (Clipper 0.8) */
 #include "eng_bytebeat.c"       /* BYTE: bytebeat, from METAL KAP 2 */
+#include "eng_grab.c"
 #include "eng_vector.c"         /* VECTOR: vector synthesis (Clipper 0.8) */
 #endif
 
@@ -121,6 +122,7 @@ static const engine_t *const ENGINES[NENGINES] = {&ENG_ANALOG, &ENG_DIGITAL, &EN
                                                     &ENG_FMX, &ENG_WSEQ,                   /* 19, 20 */
                                                     &ENG_JUNO, &ENG_VECTOR,                /* 21, 22 */
                                                     &ENG_BYTE,                             /* 23 */
+                                                    &ENG_GRAB,                             /* 24 */
 #endif
 };
 #if CLIPPER_SYNTH

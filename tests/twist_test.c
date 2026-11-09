@@ -176,6 +176,42 @@ int main(void)
         chk("GLIDE RND at the top: the note glides", t->v[0].pitch_cur != t->v[0].pitch16);
         trk_note_off(t, 60); vt_grnd[0] = 0; t->p[P_VOICE] = 0; run(3000); chk("GLIDE RND released: nothing left", !live());
     }
+    {   /* user formulas: the checks */
+        static bb_user_t u; int32_t var[10] = {128, 128, 128, 128};
+        static const uint8_t OK[] = {BB_T, BB_K, BB_MUL}, UND[] = {BB_K, BB_MUL}, BADV[] = {BB_V}; static const int32_t OKA[] = {0, 3, 0}, UA[] = {1, 0}, VA[] = {99};
+        chk("install: t*3 accepted", bb_install(0, OK, OKA, 3, 0, 0, &u)); bb_user[0] = u;
+        chk("install: it runs", bb_run(BB_N, 7, var) == 21);
+        chk("install: packed in one", u.n == 2u);
+        chk("install: stack underflow refused", !bb_install(0, UND, UA, 2, 0, 0, &u));
+        chk("install: unknown variable refused", !bb_install(0, BADV, VA, 1, 0, 0, &u));
+        memset(&bb_user[0], 0, sizeof u);
+    }
+    {   /* CHAOS gives the sound back, REMIX drops and comes back, GRAB records */
+        track_t *t = &trk[0]; int16_t before[8]; uint32_t q; int same = 1, seenbits = 0;
+        quiet(); host_preset(t, ENGI_BYTE, 24); t->p[P_AMODE] = 0;
+        memcpy(before, &t->p[P_E0], sizeof before);
+        trk_note_on(t, 48, 100);
+        tw_midi_cc(83, 127);
+        for (q = 0; q < 8000u; q++) { run(1); seenbits |= tw_ch != 0; if (q % 500u == 0u) { trk_note_on(t, 52, 90); trk_note_off(t, 52); } }
+        chk("CHAOS: its twists turn on", seenbits);
+        tw_midi_cc(83, 0); run(40);
+        chk("CHAOS let go: nothing of it left", tw_ch == 0u && !tw_is(TW_MUT));
+        for (q = 0; q < 8u; q++) same &= t->p[P_E0 + q] == before[q];
+        chk("CHAOS let go: the sound exactly as it was", same);
+        { uint32_t g = 0; for (k = 0; k < NVOICE; k++) g += t->v[k].gate != 0; chk("CHAOS let go: the held note sounds", g >= 1u); }
+        trk_note_off(t, 48); run(3000); chk("CHAOS: nothing left", !live());
+        tw_midi_cc(81, 127); run(4);
+        chk("GRAB recording", grb_st == 2u);
+        { static int32_t oo[64]; for (q = 0; q < 25000u && grb_st; q++) { grb_tap(oo, 32); run(1); } }
+        chk("GRAB: filled and stopped", grb_st == 0u && grb_len == GRB_N);
+        memset(grb_buf, 40, GRB_N);
+        quiet(); host_preset(t, ENGI_GRAB, 0); t->engine = t->eng_req = ENGI_GRAB;
+        trk_note_on(t, 50, 100); run(200);
+        chk("GRAB engine sounds", bounded());
+        { uint32_t vi = 0; while (vi < NVOICE - 1u && !t->v[vi].gate) vi++; chk("slice of its key", t->v[vi].ph[2] > t->v[vi].ph[1] && t->v[vi].ph[1] == 2u * GRB_N / 16u); }
+        trk_note_off(t, 50); run(3000); chk("GRAB released: nothing left", !live());
+        grb_len = 0;
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

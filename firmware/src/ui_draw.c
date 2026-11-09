@@ -803,7 +803,7 @@ static void graph_bytes(void)
 {
     static uint8_t q[BB_VH][BB_VW];
     const track_t *t = TSEL;
-    uint32_t prog = (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_N - 1), x, y, base = 8192u, n = 60u, lo = 255u, hi = 0u, sp;
+    uint32_t prog = (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_NT - 1), x, y, base = 8192u, n = 60u, lo = 255u, hi = 0u, sp;
     uint32_t mask = 0xFFu << (((uint32_t)clamp(t->p[P_E7], 0, 127) * 7u) / 127u);
     int32_t var[10] = {0};
     {
@@ -866,7 +866,7 @@ static void graph_arp(void)
     enum { X0 = 82, X1 = 160, Y0 = 36, Y1 = 86, LEG = 116, BX0 = 48, BX1 = 196, BY0 = 1, BY1 = 121 };
     const track_t *t = TSEL;
     uint32_t mode = (uint32_t)clamp(t->p[P_AMODE], 0, 15), g = GROUP[mode], x, y, i, n = t->nheld > 8u ? 8u : t->nheld;
-    uint32_t prog = t->eng_req == ENGI_BYTE ? (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_N - 1) : mode % BB_N, ph = ui.frame / 3u;
+    uint32_t prog = t->eng_req == ENGI_BYTE ? (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_NT - 1) : mode % BB_N, ph = ui.frame / 3u;
     int32_t var[10] = {128, 128, 128, 128, 0, 0, 0, 0, 0, 60}, flip = (t->arp_idx & 1u) || (!t->arp_note && (ui.frame / 16u & 1u)) ? -1 : 1, lo = 127, hi = 0;
     const uint16_t L = RGB(235, 235, 240), col = TE_COL[mode & 3u];
     int32_t b;
@@ -942,7 +942,7 @@ static const char *const CAT_ART[CAT_H] = {"..X..........X..", ".XXX........XXX.
 static uint8_t fl_on = 1;
 static uint32_t fl_fx(void)
 {
-    return (tw_mask | tw_cc | tw_auto_now) & ~(1u << TW_ALLOFF | 1u << TW_CATS | 1u << TW_SETA | 1u << TW_SETB | 1u << TW_RECCLR);
+    return (tw_mask | tw_cc | tw_auto_now | tw_ch | tw_rm) & ~(1u << TW_GRAB | 1u << TW_ALLOFF | 1u << TW_CATS | 1u << TW_SETA | 1u << TW_SETB | 1u << TW_RECCLR);
 }
 static uint32_t fl_morph(void) { return fl_on && TSEL->eng_req == ENGI_BYTE ? (uint32_t)clamp(TSEL->p[P_E6], 0, 127) : 0u; }
 static uint16_t fl_strobe(uint32_t v)                    /* MORPH's colour this instant; black in the off half of its strobe */
@@ -1463,7 +1463,15 @@ UI_SMALL static void ui_draw(void)
 {
     ui_draw_page();
 #if CLIPPER_SYNTH
-    fl_lightning(fl_fx() | (fl_morph() ? 1u << 31 : 0u), fl_morph());
+    if (grb_done) {
+        grb_done = 0;
+        ui_message(grb_len ? "GRABBED" : "GRAB EMPTY");
+    }
+    if (tw_chaos_key != 0xFFu && ui.layer != LY_FX) {   /* (FX let go before the key) */
+        tw_chaos_key = 0xFF;
+        tw_mask &= ~(1u << TW_CHAOS);
+    }
+    fl_lightning(fl_fx() | (fl_morph() ? 1u << 31 : 0u), tw_ch ? 127u : fl_morph());
 #endif
 }
 UI_SMALL static void ui_draw_page(void)

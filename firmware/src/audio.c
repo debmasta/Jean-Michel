@@ -29,6 +29,9 @@ static void audio_block(int32_t *out, uint32_t n)       /* mix (fx.c), then Q15 
 {
     uint32_t i;
     mix_block(out, n);
+#if CLIPPER_SYNTH
+    grb_tap(out, n);                                    /* the "grab" key: what comes out, into the sampler */
+#endif
 #if FELUCCA_UAC
     uac_tap(usb_full_now ? usb_out : out, n);           /* the USB audio input: the master output, or at full level */
 #endif

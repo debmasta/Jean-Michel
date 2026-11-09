@@ -10,7 +10,7 @@ static void tw_cc_out(void);
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
        TW_ALLOFF, TW_CATS,
        /* page 2 (the first black keys pick the page) */
-       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_NUA, TW_FOOT, TW_POLY, TW_N };
+       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_NUA, TW_FOOT, TW_POLY, TW_CHAOS, TW_REMIX, TW_GRAB, TW_N };
 #define TW_NSC 19u
 static const int8_t TW_SC[TW_NSC][13] = {
     {0, 1, 3, 5, 7, 8, 10, -1}, {0, 2, 3, 7, 8, -1}, {0, 2, 4, 6, 8, 10, -1}, {0, 2, 3, 5, 7, 8, 10, -1}, {0, 3, 5, 7, 10, -1},
@@ -49,6 +49,8 @@ static const char *const TN_FST[] = {"JUKE", "GHETTO", "ROLLS", "CHOP"};
 static const char *const TN_FVR[] = {"0", "25", "50", "75", "100"};
 static const char *const TN_PRT[] = {"3:2", "3:4", "5:4", "7:4", "5:3", "7:5"};
 static const char *const TN_PSP[] = {"SAME", "OCT", "5TH", "WIDE"};
+static const char *const TN_REV[] = {"2", "4", "8", "16"};
+static const char *const TN_RWI[] = {"SOFT", "MID", "WILD"};
 #define NN(a) (uint8_t)(sizeof(a) / sizeof(a[0]))
 static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_STUT] = {{"rate", NN(TN_STUT), 4, TN_STUT}},
@@ -70,10 +72,11 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
     [TW_FOOT] = {{"style", NN(TN_FST), 0, TN_FST}, {"vary", NN(TN_FVR), 2, TN_FVR}},
     [TW_POLY] = {{"ratio", NN(TN_PRT), 1, TN_PRT}, {"spread", NN(TN_PSP), 1, TN_PSP}},
+    [TW_REMIX] = {{"every", NN(TN_REV), 1, TN_REV}, {"wild", NN(TN_RWI), 1, TN_RWI}},
     [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "flash", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "flash", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly", "CHAOS", "remix", "grab"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
 static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
@@ -104,7 +107,8 @@ static volatile int32_t tw_cc_semi;
  * RAM only: not saved with the project */
 static uint32_t tw_auto[NSTEP];
 static volatile uint32_t tw_auto_now;
-static inline int tw_is(uint32_t k) { return ((tw_mask | tw_cc | tw_auto_now) >> k) & 1u; }
+static volatile uint32_t tw_ch, tw_rm;           /* CHAOS and REMIX: the twists they turn on for a moment, on top of yours */
+static inline int tw_is(uint32_t k) { return ((tw_mask | tw_cc | tw_auto_now | tw_ch | tw_rm) >> k) & 1u; }
 static inline uint32_t tw_v(uint32_t k, uint32_t p) { return tw_p[k][p]; }
 
 static void tw_init(void)
@@ -180,7 +184,7 @@ static void tw_on(uint32_t note, uint32_t vel)
     if (tw_is(TW_MUT)) {                         /* MUTATE: this note, the sound's numbers thrown around where they are */
         static const uint8_t R[3] = {10, 28, 64};
         const engine_t *e = ENGINES[t->engine % NENGINES];
-        uint32_t k, a = R[tw_v(TW_MUT, 0)];
+        uint32_t k, a = tw_ch ? 64u : R[tw_v(TW_MUT, 0)];
         for (k = 0; k < 8u; k++) {
             const param_desc_t *d = &e->edit[k];
             if (!d->names && d->max > d->min && (tw_mut_have >> k & 1u))
@@ -406,6 +410,70 @@ static void rhy_block(uint32_t adv)
         }
     }
 }
+/* CHAOS (hold): every half beat another mix of twists, MUTATE always in (so the sound is put back as it was when it ends, by MUTATE's own
+ * snapshot). REMIX: at the end of every N bars of the transport, a fill, a roll or a drop. GRAB: when its recording starts and ends */
+#define TB(x) (1u << TW_##x)
+static void chaos_block(void)
+{
+    static const uint32_t C[6] = {TB(FOOT), TB(ROLL), TB(STUT) | TB(OCT), TB(FOOT) | TB(OCT), TB(POLY), TB(ROLL) | TB(OCT)};
+    static uint32_t seen = 0xFFFFFFFFu;
+    uint32_t h;
+    if (!(((tw_mask | tw_cc) >> TW_CHAOS) & 1u)) {
+        tw_ch = 0;
+        seen = 0xFFFFFFFFu;
+        return;
+    }
+    h = song.playing ? (uint32_t)(bb_Tnow >> 27) : vt_tick >> 9;
+    if (h != seen) {
+        seen = h;
+        tw_ch = C[tw_rnd(6)] | TB(MUT);
+    }
+}
+static void remix_block(void)
+{
+    static const struct { uint8_t from, drop; uint32_t bits; } EV[7] = {
+        {3, 0, TB(ROLL)}, {2, 0, TB(STUT)}, {3, 0, TB(OCT) | TB(ROLL)}, {2, 0, TB(FOOT)}, {3, 1, 0}, {2, 0, TB(FOOT) | TB(OCT) | TB(MUT)}, {0, 2, 0}};
+    static const uint8_t EVERY[4] = {2, 4, 8, 16}, CNT[3] = {3, 5, 7};
+    static uint32_t cyc = 0xFFFFFFFFu, ev;
+    uint32_t beat, bar, n;
+    if (!song.playing || !tw_is(TW_REMIX)) {
+        tw_rm = 0, rmx_drop = 0, cyc = 0xFFFFFFFFu;
+        return;
+    }
+    beat = (uint32_t)(bb_Tnow >> 28), bar = beat / 4u, n = EVERY[tw_v(TW_REMIX, 0)];
+    if (bar / n != cyc) {
+        cyc = bar / n;
+        ev = tw_rnd(CNT[tw_v(TW_REMIX, 1)]);
+    }
+    if (bar % n == n - 1u && beat % 4u >= EV[ev].from)
+        tw_rm = EV[ev].bits, rmx_drop = EV[ev].drop;
+    else
+        tw_rm = 0, rmx_drop = 0;
+}
+static void grab_block(void)
+{
+    static uint32_t from;
+    if (grb_st == 1u) {
+        uint32_t b = (uint32_t)(bb_Tnow >> 28);
+        if (!song.playing || b != from) {
+            if (from == 0xFFFFFFFFu) {                   /* (armed just now: playing, wait for the next beat) */
+                from = b;
+                if (song.playing)
+                    return;
+            }
+            from = b;
+            grb_w = 0, grb_c = 0, grb_acc = 0;
+            grb_st = 2;
+        }
+    } else if (grb_st == 2u && (grb_w >= GRB_N || (song.playing && (uint32_t)(bb_Tnow >> 28) - from >= 4u))) {
+        grb_len = grb_w;
+        grb_st = 0;
+        grb_done = 1;
+        from = 0xFFFFFFFFu;
+    } else if (!grb_st) {
+        from = 0xFFFFFFFFu;
+    }
+}
 /* once per control block, adv = its length in clock units */
 static void tw_block(uint32_t adv)
 {
@@ -520,6 +588,9 @@ static void tw_block(uint32_t adv)
     }
     tw_bend = (semis + tw_cc_semi) * 4096;
     vt_tick++;
+    chaos_block();
+    remix_block();
+    grab_block();
     tw_triple(adv);
     rhy_block(adv);
     {   /* BYTE LFO: a formula's bytes as a modulation, locked to the tempo */
@@ -607,6 +678,22 @@ static int tw_midi_cc(uint32_t cc, uint32_t v)
         tw_p[k][p] = (uint8_t)(v * TW_PAR[k][p].n / 128u);
         return 1;
     }
+    if (cc == 89u || cc == 90u) {                 /* REMIX every, wild */
+        tw_init();
+        tw_p[TW_REMIX][cc - 89u] = (uint8_t)(v * TW_PAR[TW_REMIX][cc - 89u].n / 128u);
+        return 1;
+    }
+    if (cc == 81u) {                              /* GRAB */
+        if (v >= 64u && !grb_st)
+            grb_st = 1;
+        return 1;
+    }
+    if (cc == 82u || cc == 83u) {                 /* REMIX, CHAOS */
+        uint32_t b = 1u << (cc == 82u ? TW_REMIX : TW_CHAOS);
+        tw_init();
+        if (v >= 64u) tw_cc |= b; else tw_cc &= ~b;
+        return 1;
+    }
     if (cc == 30u || cc == 31u) {
         uint32_t b = 1u << (cc == 30u ? TW_FOOT : TW_POLY);
         tw_init();
@@ -657,6 +744,7 @@ static int tw_midi_cc(uint32_t cc, uint32_t v)
     return 0;
 }
 /* (UI, every frame) a held twist that is a parameter comes on or goes off */
+static uint8_t tw_chaos_key = 0xFF;
 static void tw_poll(void)
 {
     if ((tw_cc | tw_auto_now) != tw_cc_seen) {

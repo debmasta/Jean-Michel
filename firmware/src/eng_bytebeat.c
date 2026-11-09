@@ -65,7 +65,7 @@ static void bb_note_on(track_t *t, voice_t *v)
 static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
 {
     const int16_t *p = t->p;
-    uint32_t prog = (uint32_t)clamp(p[P_E0], 0, (int32_t)BB_N - 1), i, hold = bb_hold, wait = 0;
+    uint32_t prog = (uint32_t)clamp(p[P_E0], 0, (int32_t)BB_NT - 1), i, hold = bb_hold, wait = 0;
     int needT;
     uint32_t mask = 0xFFu << (((uint32_t)clamp(p[P_E7], 0, 127) * 7u) / 127u);
     uint64_t tq = (uint64_t)v->ph[1] << 32 | v->ph[0];
@@ -78,7 +78,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
     bb_knobs(p, var, &cut);                            /* (noon, 64: 128, the original formula) */
     var[4] = var[5] = var[6] = var[7] = 0;
     var[9] = v->note;
-    needT = BB_PROG[prog].uses_T || var[3] != 128;     /* a formula without T only changes with t: at 120 BPM T alone would double the work */
+    needT = bb_uses_T(prog) || var[3] != 128;     /* a formula without T only changes with t: at 120 BPM T alone would double the work */
     if (playing)
         Tq = bb_Tnow;
     else
@@ -132,7 +132,7 @@ static const engine_t ENG_BYTE = {
     .name = "BYTE",
     .page_title = {"FORMULA", "TONE"},
     .edit = {
-        {"FORM", F_ENUM, 0, BB_N - 1, 0, N_BB, 0},
+        {"FORM", F_ENUM, 0, BB_NT - 1, 0, N_BB, 0},
         {"A", F_INT, 0, 127, 64, 0, 0},
         {"B", F_INT, 0, 127, 64, 0, 0},
         {"C", F_INT, 0, 127, 64, 0, 0},

@@ -350,6 +350,12 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
     if (layer >= LY_COUNT)
         return;                                         /* (KB_GRID: the DRUMS grid page's, ui_studio.c) */
     if (!down) {
+#if CLIPPER_SYNTH
+        if (layer == LY_FX && k == tw_chaos_key) {
+            tw_chaos_key = 0xFF;
+            tw_mask &= ~(1u << TW_CHAOS);
+        }
+#endif
         if (w >= 0) {
             ui.step_held &= (uint16_t)~(1u << w);
             if (layer == LY_STEP)
@@ -387,6 +393,14 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
                 bb_snap[w - TW_SETA][i] = trk[0].p[P_E1 + i];
             bb_have |= (uint8_t)(1u << (w - TW_SETA));
             tw_sel = (uint8_t)w;
+        } else if (w == TW_CHAOS) {                     /* as long as the key is down */
+            tw_mask |= 1u << TW_CHAOS;
+            tw_chaos_key = (uint8_t)k;
+            tw_sel = TW_CHAOS;
+        } else if (w == TW_GRAB) {
+            if (!grb_st)
+                grb_st = 1;
+            tw_sel = TW_GRAB;
         } else if (w == TW_RECCLR) {
             memset(tw_auto, 0, sizeof tw_auto);
             tw_sel = (uint8_t)w;
@@ -749,7 +763,7 @@ UI_SMALL static void layer_screen_draw(void)
         str_cpy(sub, TW_LAB[tw_sel], sizeof sub);
         for (i = 0; i < 16u; i++) {
             uint32_t ti = i + 16u * tw_page;
-            int on = ti >= TW_N ? 0 : ti == TW_CATS ? fl_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_RECCLR ? 0 : tw_is(ti);   /* (lit however it is on: key, MIDI, sequencer) */
+            int on = ti >= TW_N ? 0 : ti == TW_CATS ? fl_on : ti == TW_SETA || ti == TW_SETB ? (bb_have >> (ti - TW_SETA)) & 1u : ti == TW_GRAB ? grb_st != 0 : ti == TW_RECCLR ? 0 : tw_is(ti);   /* (lit however it is on: key, MIDI, sequencer) */
             str_cpy(tl[i].lab, ti < TW_N ? TW_LAB[ti] : "", 8);
             tl[i].bg = on ? C_WHITE : TE_G1;
             tl[i].fg = on ? C_BLACK : TE_G4;
