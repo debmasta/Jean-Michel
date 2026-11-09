@@ -519,6 +519,7 @@ static void tw_block(uint32_t adv)
             semis += P[tw_v(TW_PUP, 0)];
     }
     tw_bend = (semis + tw_cc_semi) * 4096;
+    vt_tick++;
     tw_triple(adv);
     rhy_block(adv);
     {   /* BYTE LFO: a formula's bytes as a modulation, locked to the tempo */

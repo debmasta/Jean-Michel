@@ -27,7 +27,8 @@ enum { X_LYMODE, X_LYSOUND, X_LYSPLIT, X_LYLEVEL, X_LYOCT, X_LYPAN, X_LYFILT, X_
        X_MBEND, X_MLOCAL, X_MPROG, X_MCCO,             /* 1.0: the bend range (voice.c midi_bend), LOCAL, PROG, CC OUT */
        X_MBRTH,                                        /* 1.0: EWI (seq.c midi_breath) */
        X_BMORPH, X_BSLOT, X_BSAVE, X_BLOAD,
-       X_RFOOT, X_RVARY, X_RPOLY, X_RSPRD,             /* GLO > RHYTHM: footwork off / style, its variation; poly off / ratio, spread */            /* BYTE MEM: MORPH, the memory A..D, capture into it, load it back */
+       X_RFOOT, X_RVARY, X_RPOLY, X_RSPRD, /* 61.. */             /* GLO > RHYTHM: footwork off / style, its variation; poly off / ratio, spread */            /* BYTE MEM: MORPH, the memory A..D, capture into it, load it back */
+       X_VFLAM, X_VSTACK, X_VGRND, X_VDRIFT,           /* EDIT > VOICE 4 (voice.c), per part */
        X_COUNT };
 static void mseq_fill(struct track *t, uint32_t l, uint32_t f);
 static const char *const N_QFILL[] = {"--", "RAMP+", "RAMP-", "TRI", "SINE", "SQR", "RND", "FLAT", "INVRT", "SHIFT"};
@@ -52,6 +53,7 @@ static const char *const N_MCCO[] = {"OFF", "CC"};   /* (5 characters a value: "
 static const char *const N_MBRTH[] = {"OFF", "VOL", "V+AT"};
 _Static_assert(X_MIN == 50 && X_MOUT == 51 && X_MBEND == 52 && X_MCCO == 55 && X_MBRTH == 56, "params.c PAGES: MIDI's ids");
 static param_desc_t xd_sound = {"SOUND", F_INT, 0, 0, 0, 0, 0};   /* (its range: the list's length, syn_desc) */
+static const char *const N_VSTACK[] = {"OFF", "OCT", "5TH", "OCT+5"};
 static const char *const N_BSLOT[] = {"A", "B", "C", "D"};
 static const char *const N_RFOOT[] = {"OFF", "JUKE", "GHETTO", "ROLLS", "CHOP"};
 static const char *const N_RPOLY[] = {"OFF", "3:2", "3:4", "5:4", "7:4", "5:3", "7:5"};
@@ -106,6 +108,10 @@ static const param_desc_t XD[X_COUNT] = {
     [X_MLOCAL] = PE("LOCAL", N_ONOFF, 1),
     [X_MPROG] = PE("PROG", N_ONOFF, 1),
     [X_MCCO] = PE("SEND", N_MCCO, 0),
+    [X_VFLAM] = PD("FLAM", F_PCT, 0, 127, 0),
+    [X_VSTACK] = PE("STACK", N_VSTACK, 0),
+    [X_VGRND] = PD("GLRND", F_PCT, 0, 127, 0),
+    [X_VDRIFT] = PD("DRIFT", F_PCT, 0, 127, 0),
     [X_RFOOT] = PE("FOOT", N_RFOOT, 0),
     [X_RVARY] = PE("VARY", TN_FVR, 2),
     [X_RPOLY] = PE("POLY", N_RPOLY, 0),
@@ -616,6 +622,10 @@ UI_SMALL static const param_desc_t *syn_desc(uint32_t id, int16_t **valp)
     case X_MPROG: xv[X_MPROG] = !midi_pc_off; *valp = &xv[X_MPROG]; break;
     case X_MCCO: xv[X_MCCO] = midi_cc_out != 0u; *valp = &xv[X_MCCO]; break;
     case X_BMORPH: *valp = &TSEL->p[P_E6]; break;
+    case X_VFLAM: xv[X_VFLAM] = vt_flam[vt_part(TSEL)]; *valp = &xv[X_VFLAM]; break;
+    case X_VSTACK: xv[X_VSTACK] = vt_stack[vt_part(TSEL)]; *valp = &xv[X_VSTACK]; break;
+    case X_VGRND: xv[X_VGRND] = vt_grnd[vt_part(TSEL)]; *valp = &xv[X_VGRND]; break;
+    case X_VDRIFT: xv[X_VDRIFT] = vt_drift[vt_part(TSEL)]; *valp = &xv[X_VDRIFT]; break;
     case X_RFOOT: tw_init(); xv[X_RFOOT] = ((tw_mask >> TW_FOOT) & 1u) ? (int16_t)(tw_p[TW_FOOT][0] + 1) : 0; *valp = &xv[X_RFOOT]; break;
     case X_RVARY: tw_init(); xv[X_RVARY] = tw_p[TW_FOOT][1]; *valp = &xv[X_RVARY]; break;
     case X_RPOLY: tw_init(); xv[X_RPOLY] = ((tw_mask >> TW_POLY) & 1u) ? (int16_t)(tw_p[TW_POLY][0] + 1) : 0; *valp = &xv[X_RPOLY]; break;
@@ -740,6 +750,10 @@ UI_SMALL static void syn_changed(uint32_t id, int16_t *vp)
         tw_cc_out();
         break;
     }
+    case X_VFLAM: vt_flam[vt_part(TSEL)] = (uint8_t)*vp; break;
+    case X_VSTACK: vt_stack[vt_part(TSEL)] = (uint8_t)*vp; break;
+    case X_VGRND: vt_grnd[vt_part(TSEL)] = (uint8_t)*vp; break;
+    case X_VDRIFT: vt_drift[vt_part(TSEL)] = (uint8_t)*vp; break;
     case X_RVARY: tw_p[TW_FOOT][1] = (uint8_t)*vp; break;
     case X_RSPRD: tw_p[TW_POLY][1] = (uint8_t)*vp; break;
     case X_BMORPH:

@@ -157,6 +157,25 @@ int main(void)
         tw_mask = 0; run(40); trk_note_off(&trk[0], 48); run(3000); chk("POLY off, released: nothing left", bounded() && !live());
         tw_midi_cc(28, 127); chk("CC 28 sets the ratio", tw_p[TW_POLY][0] == 5u); tw_midi_cc(28, 30);
     }
+    {   /* VOICE 4 */
+        track_t *t = &trk[0]; uint32_t g;
+        quiet(); host_preset(t, 0u, 0); t->p[P_AMODE] = 0; t->p[P_VOICE] = V_UNISON;
+        vt_stack[0] = 1; trk_note_on(t, 48, 100); run(4);
+        chk("STACK: voice 1 an octave up, voice 0 not", t->v[1].pitch16 == 60 * 16 && t->v[0].pitch16 == 48 * 16);
+        trk_note_off(t, 48); run(3000); chk("STACK released: nothing left", !live()); vt_stack[0] = 0;
+        vt_flam[0] = 40; trk_note_on(t, 48, 100);
+        for (g = 0, k = 1; k < NVOICE; k++) g += t->v[k].gate != 0;
+        chk("FLAM: the others wait", g == 0u); run(400);
+        for (g = 0, k = 1; k < NVOICE; k++) g += t->v[k].gate != 0;
+        chk("FLAM: then they come", g >= 1u);
+        trk_note_off(t, 48); run(3000); chk("FLAM released: nothing left", !live());
+        trk_note_on(t, 50, 100); run(1); trk_note_off(t, 50); run(3000); chk("FLAM cut short: no voice left behind", !live()); vt_flam[0] = 0;
+        vt_drift[0] = 127; vt_tick = 700; chk("DRIFT moves the pitch", vt_drift_q(t, &t->v[0]) != vt_drift_q(t, &t->v[1])); vt_drift[0] = 0;
+        t->p[P_VOICE] = 1; t->p[P_GLIDE] = 0; vt_grnd[0] = 127;
+        trk_note_on(t, 48, 100); run(10); trk_note_off(t, 48); run(10); trk_note_on(t, 60, 100);
+        chk("GLIDE RND at the top: the note glides", t->v[0].pitch_cur != t->v[0].pitch16);
+        trk_note_off(t, 60); vt_grnd[0] = 0; t->p[P_VOICE] = 0; run(3000); chk("GLIDE RND released: nothing left", !live());
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

@@ -285,9 +285,34 @@ static int32_t glide_ticks(int32_t g)                    /* control ticks of TIM
     int32_t k = (int32_t)ENV_LIN[g & 127];
     return k ? (int32_t)((1u << 24) / (uint32_t)k) : 1;
 }
+#if CLIPPER_SYNTH
+/* EDIT > VOICE 4, per part: FLAM (UNISON's voices start one after the other), STACK (every other unison voice up an octave / a fifth),
+ * GLIDE RND (only some notes glide), DRIFT (each voice's pitch wanders by itself). No voice more than the part already uses */
+static uint8_t vt_flam[NPART], vt_stack[NPART], vt_grnd[NPART], vt_drift[NPART];
+static uint32_t vt_tick;                                 /* control blocks (twist.c tw_block) */
+static struct { uint8_t left, note, vel, glide; } vt_fl[NPART][NVOICE];
+static inline uint32_t vt_part(const track_t *t) { return (uint32_t)(t - trk) % NPART; }
+static int32_t vt_off(const track_t *t, uint32_t i)      /* STACK: semitones for unison voice i */
+{
+    uint32_t m = vt_stack[vt_part(t)];
+    return !(i & 1u) ? 0 : m == 1u ? 12 : m == 2u ? 7 : m == 3u ? ((i & 2u) ? 19 : 12) : 0;
+}
+static inline int32_t vt_drift_q(const track_t *t, const voice_t *v)   /* 1/4096 semitone, up to +-50 cents */
+{
+    uint32_t d = vt_drift[vt_part(t)], u;
+    if (!d)
+        return 0;
+    u = (vt_tick * (23u + (uint32_t)(v - t->v) % NVOICE * 11u)) & 0xFFFFu;
+    return ((int32_t)(u < 32768u ? u : 65535u - u) - 16384) * (int32_t)d / 127 / 8;
+}
+#endif
 static void glide_set(track_t *t, voice_t *v, int glide)
 {
     int32_t d, ticks;
+#if CLIPPER_SYNTH
+    if (vt_grnd[vt_part(t)])                             /* (the same answer for all the voices of a note: one tick, one note) */
+        glide = (((vt_tick * 2654435761u) ^ ((uint32_t)v->note * 40503u)) >> 13) % 127u < vt_grnd[vt_part(t)];
+#endif
     if (!glide || !v->pitch_cur) {
         v->pitch_cur = v->pitch16;
         v->pitch_frac = 0;
@@ -451,21 +476,12 @@ static void unison_spread(track_t *t, voice_t *v, uint32_t r)
         v->ph[0] += r;
 }
 
-/* MONO / LEGATO / UNISON: one note on one voice (eight for UNISON, or the
- * engine's voice cap, spread by DETUNE over the same width) */
-static void mono_play(track_t *t, uint32_t note, uint32_t vel, int retrig, int glide)
+static void uni_start(track_t *t, uint32_t i, uint32_t nv, uint32_t note, uint32_t vel, int glide)
 {
-    uint32_t mode = voice_mode(t), nv = mode == V_UNISON ? trk_nvoice(t) : 1u, i;
-    for (i = 0; i < nv; i++) {
-        voice_t *v = &t->v[i];
-        int32_t k = 2 * (int32_t)i - (int32_t)(nv - 1u);   /* -7 .. 7 */
-        if (nv > 1u && nv < NVOICE)
-            k = k * (NVOICE - 1) / (int32_t)(nv - 1u);      /* fewer voices: the outer ones as wide */
-        v->fine = nv > 1u ? k * t->p[P_DETUNE] * 56 / 889 : 0;   /* up to ~±40 cents */
-        if (retrig || !v->active || !v->gate) {
-            int was_sounding = v->active && v->stage != 0;
+    voice_t *v = &t->v[i];
+    int was_sounding = v->active && v->stage != 0;
             if ((!v->active || v->stage == 4u) && !voice_room(t, i > 0))
-                continue;                                   /* no room for this extra UNISON voice */
+                return;                                   /* no room for this extra UNISON voice */
             /* level: about the same sum for 8 or 4 voices at random phases */
             voice_start(t, v, note, nv >= NVOICE ? vel * 36u / 100u : nv > 1u ? vel / 2u : vel, glide);
             if (nv > 1u && i && !was_sounding) {   /* random start phases (SAMPLE: its start; not SLICE): */
@@ -474,12 +490,46 @@ static void mono_play(track_t *t, uint32_t note, uint32_t vel, int retrig, int g
                 unison_spread(t, v, seed);
             } else if (nv > 1u && i && (v->pend & VP_ON))
                 v->pend |= VP_UNI;                          /* (a sample's, after its fade: spread as it starts) */
+#if CLIPPER_SYNTH
+    if (nv > 1u && vt_off(t, i) && !(v->pend & VP_ON)) {
+        v->pitch16 += vt_off(t, i) * 16;
+        glide_set(t, v, glide);
+    }
+#endif
+}
+/* MONO / LEGATO / UNISON: one note on one voice (eight for UNISON, or the
+ * engine's voice cap, spread by DETUNE over the same width) */
+static void mono_play(track_t *t, uint32_t note, uint32_t vel, int retrig, int glide)
+{
+    uint32_t mode = voice_mode(t), nv = mode == V_UNISON ? trk_nvoice(t) : 1u, i;
+#if CLIPPER_SYNTH
+    uint32_t pi = vt_part(t);
+#endif
+    for (i = 0; i < nv; i++) {
+        voice_t *v = &t->v[i];
+        int32_t k = 2 * (int32_t)i - (int32_t)(nv - 1u);   /* -7 .. 7 */
+        if (nv > 1u && nv < NVOICE)
+            k = k * (NVOICE - 1) / (int32_t)(nv - 1u);      /* fewer voices: the outer ones as wide */
+        v->fine = nv > 1u ? k * t->p[P_DETUNE] * 56 / 889 : 0;   /* up to ~±40 cents */
+        if (retrig || !v->active || !v->gate) {
+#if CLIPPER_SYNTH
+            if (i && nv > 1u && vt_flam[pi]) {
+                vt_fl[pi][i].left = (uint8_t)(i * ((uint32_t)vt_flam[pi] >> 2) + 1u);
+                vt_fl[pi][i].note = (uint8_t)note, vt_fl[pi][i].vel = (uint8_t)vel, vt_fl[pi][i].glide = (uint8_t)glide;
+                continue;
+            }
+#endif
+            uni_start(t, i, nv, note, vel, glide);
         } else {                                            /* legato: new pitch, same envelope */
             v->note = (uint8_t)note;
 #if CLIPPER_SYNTH
             v->ch = mpe_cur_ch;                             /* (MPE: the new note's channel) */
 #endif
             v->pitch16 = (int32_t)note * 16;
+#if CLIPPER_SYNTH
+            if (nv > 1u)
+                v->pitch16 += vt_off(t, i) * 16;
+#endif
             if (vel > v->vel && nv == 1u)
                 v->vel = (uint8_t)vel;
             glide_set(t, v, glide);
@@ -570,6 +620,10 @@ static void puni_on(track_t *t, uint32_t note, uint32_t vel)
         int32_t s = n > 1u ? (2 * (int32_t)j - (int32_t)(n - 1u)) * 7 : 0;   /* -7 .. 7 (x (n - 1)) */
         v->fine = n > 1u ? s * t->p[P_DETUNE] * 56 / (889 * (int32_t)(n - 1u)) : 0;
         voice_start(t, v, note, n >= 4u ? vel / 2u : n > 1u ? vel * 70u / 100u : vel, t->p[P_GLIDE] != 0);
+        if (n > 1u && vt_off(t, j) && !(v->pend & VP_ON)) {
+            v->pitch16 += vt_off(t, j) * 16;
+            glide_set(t, v, t->p[P_GLIDE] != 0);
+        }
         if (j && !was) {                                /* random start phases (in phase they stack) */
             seed = seed * 1664525u + 1013904223u;
             unison_spread(t, v, seed);
@@ -1325,6 +1379,14 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
     if (e == &ENG_HYBRID)                               /* (HYBRID: its matrix takes MW and AT) */
         mw = cat = 0;
     vib_ph[(uint32_t)(t - trk) % NPART] += 535642u * n;
+#if CLIPPER_SYNTH
+    {   /* FLAM: the unison voices whose turn has come, if the note still stands */
+        uint32_t fi, pf = vt_part(t);
+        for (fi = 1; fi < NVOICE; fi++)
+            if (vt_fl[pf][fi].left && !--vt_fl[pf][fi].left && voice_mode(t) == V_UNISON && t->v[0].gate && t->v[0].note == vt_fl[pf][fi].note)
+                uni_start(t, fi, trk_nvoice(t), vt_fl[pf][fi].note, vt_fl[pf][fi].vel, vt_fl[pf][fi].glide);
+    }
+#endif
     vib = osc_sine(vib_ph[(uint32_t)(t - trk) % NPART]);
     /* Clipper 0.4: the matrix (mx_load); sv: its sources (the part's here, the voice's in the loop) */
     mx_t mx;
@@ -1540,7 +1602,7 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
             int32_t q = (v->pitch_cur << 8) + v->pitch_frac + ((lfo * p[P_LD_PIT] * 3) >> 7) +
                         ((v->penv * p[P_ED_PIT] * 3) >> 7) + bend
 #if CLIPPER_SYNTH
-                        + ((uint32_t)(t - trk) < NPART ? tw_bend : 0)
+                        + ((uint32_t)(t - trk) < NPART ? tw_bend : 0) + vt_drift_q(t, v)
 #endif
                         ;
 #if CLIPPER_SYNTH
