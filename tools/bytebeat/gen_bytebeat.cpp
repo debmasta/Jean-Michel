@@ -9,6 +9,9 @@
 struct F { const char* name; const char* preset; const char* src; int dec = 70, sus = 127; };
 // every knob at noon (128) is the original formula; C and D are common to all: C an xor ramp, D a tempo-stepped offset
 #define W(f) f   /* C and D are applied by the firmware itself (bb_eval), lighter than in the program */
+// long kicks, footwork / 808: a triangle whose pitch drops fast onto the note (C4: 62 Hz), B the drive (noon clean, more folds over)
+#define KP(mul, k) "(t*" mul "-a*" k "/(t+640))"
+#define KT(p) "(" p "&128?255-(" p "*2&255):" p "*2&255)"
 static const F BANK[] = {
     {"42", "BB 42 MELODY", W("t*(a*21/64&t>>(b>>4)+2)")},
     {"SIERP", "BB SIERPINSKI", W("t*(b>>6)/2&t>>(a>>4)")},
@@ -35,6 +38,10 @@ static const F BANK[] = {
     {"RIM", "BP RIM", "(t*(a>>1)&128)*(t<600)^t*(b>>4)&(t<300)*64", 12, 0},
     {"ZAP", "BP ZAP", "t*(1e3-t/4)>>(a>>5)&b+127", 24, 0},
     {"PING", "BP METAL HIT", "(t*3^t*5^t*7)&(b+127)*(t<3000)", 34, 0},
+    {"808", "BK 808 LONG", "(" KT(KP("2", "64000")) "-128)*b/128+128", 108, 0},
+    {"FOOT", "BK FOOTWORK", "(" KT(KP("2", "64000")) "-128)*b/128+128^(t<60)*80", 98, 0},
+    {"BOOM", "BK BOOM", "(" KT(KP("1", "96000")) "-128)*b/128+128", 120, 0},
+    {"DIST", "BK DIST", "(" KT(KP("2", "64000")) "-128)*b/40+128", 102, 0},
 };
 int main() {
     std::vector<int> ops, args; std::string strs; std::vector<int> off, len; int maxDepth = 0;

@@ -113,7 +113,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
 
 /* {FORM, A, B, C, D, CUT, RES, BITS} */
 static const preset_t BB_PRESETS[] = {
-#define BB_P(i, name, dec, sus) {name, {i, 64, 64, 64, 64, 127, 0, 0}, {0, dec, sus, sus ? 30 : 16}, 0, 0, FX(0, 0, sus ? 15 : 4, sus ? 15 : 8)},
+#define BB_P(i, name, dec, sus) {name, {i, 64, 64, 64, 64, 127, 0, 0}, {0, dec, sus, sus ? 30 : dec > 60 ? dec : 16}, 0, 0, FX(0, 0, sus ? 15 : 4, sus ? 15 : 8)},
     BB_PRESET_LIST(BB_P)
 #undef BB_P
 };
