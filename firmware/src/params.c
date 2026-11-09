@@ -487,7 +487,7 @@ enum { FAM_HOME, FAM_ENV, FAM_LFO, FAM_FX, FAM_SCL, FAM_EDIT, FAM_GLO, FAM_SAVE,
        FAM_COUNT };
 enum { SC_TRACK, SC_GLOBAL, SC_ENGINE, SC_STEP, SC_TRK, SC_SONG, SC_DRUM, SC_SYN };   /* SC_SYN: ui_synth.c */
 enum { GR_NONE, GR_ADSR, GR_LFO, GR_STEPS, GR_ARP, GR_SCALE, GR_FX, GR_ROLL, GR_BROWSE, GR_SLOTS, GR_USER, GR_TRK,
-       GR_SLCR, GR_LAYER, GR_MORPH, GR_MATRIX, GR_FMX, GR_HIST, GR_MSEQ };
+       GR_SLCR, GR_LAYER, GR_MORPH, GR_MATRIX, GR_FMX, GR_HIST, GR_MSEQ, GR_BYTES };
 
 typedef struct {
     const char *title;
@@ -537,6 +537,9 @@ static const page_t PAGES[] = {
     {"SEL", FAM_SCL, SC_TRACK, GR_SCALE, {P_ROOT, P_SCALE, P_QUANT, P_CHORD}},
     {"SEL 2", FAM_SCL, SC_TRACK, GR_SCALE, {P_TRANS, P_STRUM, P_VLEAD, 0xFF}},   /* (2.4: the chords played) */
     {"EDIT 1", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E0, P_E1, P_E2, P_E3}},
+#if CLIPPER_SYNTH
+    {"BYTE MEM", FAM_EDIT, SC_SYN, GR_BYTES, {57, 58, 59, 60}},   /* X_BMORPH X_BSLOT X_BSAVE X_BLOAD (ui_synth.c), on BYTE only */
+#endif
     {"EDIT 2", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E4, P_E5, P_E6, P_E7}},
 #if CLIPPER_SYNTH                                          /* 0.6: FMX's own pages (ui_synth.c X_F*), on FMX only */
     {"OP", FAM_EDIT, SC_SYN, GR_FMX, {19, 20, 21, 22}},          /* X_FOP X_FWAVE X_FMODE X_FRATIO */
@@ -595,7 +598,7 @@ static const page_t PAGES[] = {
 static int page_hidden(uint32_t i)
 {
 #if CLIPPER_SYNTH
-    return i < NPAGES && PAGES[i].graph == GR_FMX && TSEL->eng_req != ENGI_FMX;
+    return i < NPAGES && ((PAGES[i].graph == GR_FMX && TSEL->eng_req != ENGI_FMX) || (PAGES[i].graph == GR_BYTES && TSEL->eng_req != ENGI_BYTE));
 #else
     (void)i;
     return 0;

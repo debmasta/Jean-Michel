@@ -16,18 +16,26 @@ _Static_assert(BB_MAXDEPTH < BB_STACK, "a factory formula is deeper than the VM'
 
 /* T: worked out once a block (twist.c tw_block), not per voice: a 64-bit division is dear on this CPU */
 static uint64_t bb_Tnow, bb_Tstep;
-/* MORPH (EDIT 2, CC 24): two states of A B C D CUT, stored with the "set A" and "set B" keys of the FX window; the knob glides from
- * A to B. At 0, or until both are stored, the knobs as they stand */
-static int16_t bb_snap[2][5];
+/* MORPH (EDIT 2, the BYTE MEM page, CC 24, a step's lock): up to four states of A B C D CUT (BYTE MEM; "set A" "set B" in the FX window);
+ * the knob glides through those stored, 1 the first .. 127 the last. At 0, or with fewer than two stored, the knobs as they stand */
+static int16_t bb_snap[4][5];
 static uint8_t bb_have;
 static inline void bb_knobs(const int16_t *p, int32_t *var, int32_t *cut)
 {
-    int32_t m = clamp(p[P_E6], 0, 127), i;
-    int on = m > 0 && bb_have == 3u;
+    int32_t m = clamp(p[P_E6], 0, 127), i, n = 0, span, seg, fr;
+    uint8_t idx[4];
+    for (i = 0; i < 4; i++)
+        if ((bb_have >> i) & 1u)
+            idx[n++] = (uint8_t)i;
+    span = (m > 1 ? m - 1 : 0) * (n > 1 ? n - 1 : 0);
+    seg = span / 126;
+    fr = span % 126;
+    if (seg >= n - 1)
+        seg = n > 1 ? n - 2 : 0, fr = 126;
     for (i = 0; i < 5; i++) {
         int32_t v = clamp(p[P_E1 + i], 0, 127);
-        if (on)
-            v = (bb_snap[0][i] * (127 - m) + bb_snap[1][i] * m) / 127;
+        if (m > 0 && n >= 2)
+            v = (bb_snap[idx[seg]][i] * (126 - fr) + bb_snap[idx[seg + 1]][i] * fr) / 126;
         if (i < 4)
             var[i] = v * 2;
         else
@@ -117,7 +125,7 @@ static const engine_t ENG_BYTE = {
         {"C", F_INT, 0, 127, 64, 0, 0},
         {"D", F_INT, 0, 127, 64, 0, 0},
         {"CUT", F_CUTOFF, 0, 127, 127, 0, 0},
-        {"MORPH", F_PCT, 0, 127, 0, 0, 0},
+        {"MORPH", F_INT, 0, 127, 0, 0, 0},
         {"BITS", F_PCT, 0, 127, 0, 0, 0},
     },
     .presets = BB_PRESETS,

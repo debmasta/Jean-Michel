@@ -109,6 +109,12 @@ int main(void)
         tw_midi_cc(24, 1); bb_knobs(trk[0].p, var, &c); chk("CC 24 moves MORPH: near state A", var[0] < 26);
         tw_midi_cc(24, 64); bb_knobs(trk[0].p, var, &c); chk("halfway: between", var[0] > 100 && var[0] < 130);
         tw_midi_cc(24, 0); bb_have = 0; tw_midi_cc(20, 64); chk("CC 20 moves A", trk[0].p[P_E1] == 64); (void)pv;
+        bb_snap[0][0] = 0; bb_snap[1][0] = 40; bb_snap[2][0] = 80; bb_snap[3][0] = 120; bb_have = 15;
+        trk[0].p[P_E6] = 1; bb_knobs(trk[0].p, var, &c); chk("four memories: 1 is A", var[0] == 0);
+        trk[0].p[P_E6] = 43; bb_knobs(trk[0].p, var, &c); chk("43 is B", var[0] == 80);
+        trk[0].p[P_E6] = 85; bb_knobs(trk[0].p, var, &c); chk("85 is C", var[0] == 160);
+        trk[0].p[P_E6] = 127; bb_knobs(trk[0].p, var, &c); chk("127 is D", var[0] == 240);
+        trk[0].p[P_E6] = 0; bb_have = 0;
         memset(tw_auto, 0, sizeof tw_auto); song.playing = 1; song.rec = 1; tw_mask = 1u << TW_ROLL; run(4);
         { uint32_t st = trk[0].seq_idx % NSTEP; chk("REC writes the latched twist on the step", (tw_auto[st] >> TW_ROLL) & 1u);
           song.rec = 0; tw_mask = 0; tw_block(0); chk("PLAY plays it back", tw_is(TW_ROLL)); }

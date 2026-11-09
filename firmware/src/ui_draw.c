@@ -444,7 +444,7 @@ UI_SMALL static uint32_t graph_signature(void)
         return h ^ (ui.frame / 2u);                  /* scope: redraw every other frame */
     h ^= (uint32_t)pg->graph * 131u + TSEL->eng_req + song.sel * 7777u;
 #if CLIPPER_SYNTH
-    if (pg->scope == SC_ENGINE && TSEL->eng_req == ENGI_BYTE) {   /* BYTE: the picture scrolls with the note */
+    if ((pg->scope == SC_ENGINE || pg->graph == GR_BYTES) && TSEL->eng_req == ENGI_BYTE) {   /* BYTE: the picture scrolls with the note */
         uint32_t bt, bn;
         if (bb_sounding(TSEL, &bt, &bn))
             h ^= (ui.frame / 3u) * 2166136261u;
@@ -1049,6 +1049,10 @@ UI_SMALL static void draw_graph(void)
         case GR_MSEQ:
             graph_mseq();
             break;
+        case GR_BYTES:
+            cv_oy = 0;
+            graph_bytes();
+            break;
 #endif
         default:
 #if CLIPPER_SYNTH
@@ -1070,7 +1074,7 @@ UI_SMALL static void draw_graph(void)
     cv_oy = G_OY;
 #endif
     top = (ui.home && CLIPPER_SYNTH) || (!ui.home && !drum_note && (pg->graph == GR_BROWSE || pg->graph == GR_SLOTS || pg->graph == GR_USER ||
-                                     pg->graph == GR_ROLL || big_page(pg)));   /* these draw from the top */
+                                     pg->graph == GR_ROLL || CLIPPER_SYNTH && pg->graph == GR_BYTES || big_page(pg)));   /* these draw from the top */
     cv_oy = 0;
     if (ui.hot_t && settings.zoom && !(top && (big_page(pg) || pg->graph == GR_ROLL) && !drum_note)) {   /* (the big values show it already) */                 /* focus (menu ZOOM): the touched value, large and white */
         int32_t x;
