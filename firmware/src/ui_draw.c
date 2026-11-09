@@ -821,11 +821,9 @@ static void graph_bytes(void)
 static const char *const CAT_ART[CAT_H] = {"..X..........X..", ".XXX........XXX.", ".XXXXXXXXXXXXXX.", ".XXXXXXXXXXXXXX.", "XXXooXXXXXXooXXX",
                                            "XXXooXXXXXXooXXX", "XXXXXXXXXXXXXXXX", "XXXXXXXppXXXXXXX", ".XXXXXXppXXXXXX.", ".XXpXXXXXXXXpXX.",
                                            "..XXpppppppXXX..", "...XXXXXXXXXX..."};
-/* The FLASHES: the screen's edge shows what is on, wherever you are. A segment per twist in its own colour, turning with the beat and
- * pulsing on it; MORPH (BYTE) strobes, faster the further it is turned, its colour following the knob, on the frame and behind the graph.
- * Key "flash" in the FX window: on / off */
-#define FL_T 3
-static uint8_t fl_on = 1, fl_shown;
+/* The FLASHES, wherever you are: MORPH (BYTE) strobes the background of the graph, faster the further it is turned, its colour following
+ * the knob; lightning crosses the screen while a twist is on or MORPH turned. Key "flash" in the FX window: on / off */
+static uint8_t fl_on = 1;
 static uint32_t fl_fx(void)
 {
     return (tw_mask | tw_cc | tw_auto_now) & ~(1u << TW_ALLOFF | 1u << TW_CATS | 1u << TW_SETA | 1u << TW_SETB | 1u << TW_RECCLR);
@@ -841,21 +839,6 @@ static uint16_t fl_strobe(uint32_t v)                    /* MORPH's colour this 
 }
 static uint8_t fl_bolt, fl_two;                          /* frames of lightning left; two bolts */
 static uint16_t fl_bg(void) { return fl_on && fl_bolt == 2u ? C_WHITE : fl_strobe(200u); }
-static void fl_seg(uint32_t a, uint32_t b, uint16_t c)   /* perimeter from a to b (0..960, clockwise from the top left) */
-{
-    uint32_t e;
-    for (e = 0; e < 4u; e++) {
-        uint32_t lo = a > e * 240u ? a - e * 240u : 0u, hi = b < (e + 1u) * 240u ? b - e * 240u : 240u;
-        if (b <= e * 240u || a >= (e + 1u) * 240u || hi <= lo)
-            continue;
-        switch (e) {
-        case 0: lcd_fill(lo, 0, hi - lo, FL_T, c); break;
-        case 1: lcd_fill(240 - FL_T, lo, FL_T, hi - lo, c); break;
-        case 2: lcd_fill(240u - hi, 240 - FL_T, hi - lo, FL_T, c); break;
-        default: lcd_fill(0, 240u - hi, FL_T, hi - lo, c); break;
-        }
-    }
-}
 static uint32_t fl_rnd(uint32_t *r) { *r ^= *r << 13; *r ^= *r >> 17; *r ^= *r << 5; return *r >> 3; }
 static void fl_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t hw, uint16_t c)
 {
@@ -910,31 +893,6 @@ static void fl_lightning(uint32_t active, uint32_t m)
         lcd_fill(0, 0, 240, 240, C_BLACK);               /* (as every screen change does: no frame of the page keeps a trace) */
         ui.force = 1;
     }
-}
-static void fl_draw(void)
-{
-    uint32_t fx = fl_on ? fl_fx() : 0u, m = fl_morph(), n = (uint32_t)__builtin_popcount(fx) + (m ? 1u : 0u), beat, ph, k, s = 0;
-    if (!n) {
-        if (fl_shown) {
-            fl_shown = 0;
-            fl_seg(0, 960, C_BLACK);
-            ui.force = 1;
-        }
-        return;
-    }
-    fl_shown = 1;
-    if (song.playing)
-        beat = (uint32_t)(bb_Tnow >> 28), ph = (uint32_t)(bb_Tnow >> 20) & 255u;
-    else
-        beat = fm1_ms / 500u, ph = (fm1_ms % 500u) * 256u / 500u;
-    s = beat % n;
-    for (k = 0; k < TW_N; k++)
-        if ((fx >> k) & 1u) {
-            fl_seg(s * 960u / n, (s + 1u) * 960u / n, bb_hue(k * 37u, 255u - ph * 3u / 4u));
-            s = (s + 1u) % n;
-        }
-    if (m)
-        fl_seg(s * 960u / n, (s + 1u) * 960u / n, fl_strobe(255u));
 }
 #endif
 /* Clipper: HOME, the instrument: the sound's name large, its kind and place in the list, its engine; the
@@ -1385,7 +1343,6 @@ UI_SMALL static void ui_draw(void)
 {
     ui_draw_page();
 #if CLIPPER_SYNTH
-    fl_draw();
     fl_lightning(fl_fx() | (fl_morph() ? 1u << 31 : 0u), fl_morph());
 #endif
 }

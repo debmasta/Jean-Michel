@@ -974,14 +974,9 @@ int main(int argc, char **argv)
         #undef R
     }
 #if CLIPPER_SYNTH
-    {   /* the flashes: the edge shows the twists on, MORPH strobes, off clears them */
+    {   /* the flashes: MORPH strobes the background */
         uint32_t q, seen = 0;
         tw_init(); ui.home = 0; ui.layer = LY_PLAY;
-        tw_mask = 1u << TW_FOOT | 1u << TW_STUT; for (q = 0; q < 4u; q++) frame();
-        check(screen[1] != 0 || screen[120 * 240 + 1] != 0, "flash: the twists on show on the edge");
-        ppm("flash_fx");
-        tw_mask = 0; for (q = 0; q < 4u; q++) frame();
-        check(screen[1] == 0 && screen[239 * 240 + 120] == 0, "flash: nothing on, the edge goes dark");
         TSEL->eng_req = ENGI_BYTE; TSEL->p[P_E6] = 127;
         for (q = 0; q < 12u; q++) { frame(); if (screen[120 * 240 + 1] != 0) { seen++; if (seen == 1u) ppm("flash_morph"); } }
         check(seen > 0u && seen < 12u, "flash: MORPH strobes");
