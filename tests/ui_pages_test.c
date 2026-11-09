@@ -986,6 +986,27 @@ int main(int argc, char **argv)
         for (q = 0; q < 12u; q++) { frame(); if (screen[120 * 240 + 1] != 0) { seen++; if (seen == 1u) ppm("flash_morph"); } }
         check(seen > 0u && seen < 12u, "flash: MORPH strobes");
         TSEL->p[P_E6] = 0; frame(); frame();
+        {   /* lightning leaves no trace: on a page, in a layer, in the menu */
+            static uint16_t snap[240 * 240];
+            uint32_t w, d, x;
+            for (w = 0; w < 3u; w++) {
+                go_home(); frames(4);
+                if (w == 1u) { press(B_FX); frames(24); }
+                if (w == 2u) { ui.menu = 1; ui.force = 1; frames(4); }
+                memcpy(snap, screen, sizeof snap);
+                fl_bolt = 3; fl_two = 1;
+                frame();
+                if (w == 0u) ppm("flash_bolt");
+                for (d = 0, x = 0; x < 240u * 240u; x++) d += screen[x] != snap[x];
+                check(d > 300u, "lightning: drawn");
+                frames(8);
+                for (d = 0, x = 0; x < 240u * 240u; x++) d += screen[x] != snap[x];
+                printf("  diff after %u: %u\n", w, d);
+                check(d == 0u, "lightning: leaves no trace");
+                if (w == 1u) { release(B_FX); frames(4); }
+                if (w == 2u) { ui.menu = 0; ui.force = 1; frames(4); }
+            }
+        }
     }
 #endif
     printf("ui: %s\n", fails ? "FAILED" : "pages, layers (punch, steps, erase, roll, key, mix), layer lock, song layer, REC hold, drums, REC, 20000-frame fuzz PASS");

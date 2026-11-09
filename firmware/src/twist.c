@@ -4,6 +4,7 @@
  * takes RAM from the synth. Key 15 lets everything go, key 16 is the screen flashes (ui_draw.c).
  * Runs in the audio ISR (tw_on, tw_off, tw_block) except the parts that change a parameter (tw_apply, the UI). */
 #if CLIPPER_SYNTH
+static volatile uint8_t fl_note;                  /* counts the notes: a lightning cue for the screen (ui_draw.c) */
 static uint8_t tw_last_on, tw_last_n, tw_last_v;   /* last note played: what FOOTWORK and POLY cut up while the sequencer runs */
 static void tw_cc_out(void);
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
@@ -175,6 +176,7 @@ static void tw_on(uint32_t note, uint32_t vel)
     int32_t m = (int32_t)note;
     uint32_t i;
     tw_last_on = 1, tw_last_n = (uint8_t)note, tw_last_v = (uint8_t)vel;
+    fl_note++;
     if (tw_is(TW_MUT)) {                         /* MUTATE: this note, the sound's numbers thrown around where they are */
         static const uint8_t R[3] = {10, 28, 64};
         const engine_t *e = ENGINES[t->engine % NENGINES];
