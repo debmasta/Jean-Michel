@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* GRAB: the FM-1 resampling itself. The "grab" key of the FX window (CC 81) records what comes out, about two seconds: a bar when the transport
+/* GRAB: the FM-1 resampling itself. The "grab" key of the FX window (CC 81) records what comes out, about 1.9 seconds: a bar when the transport
  * plays (from the next beat), else the whole buffer. 11 kHz, 8 bit: crunchy, on purpose, and all the RAM there is. RAM only: gone at power-off.
  * SLICE: the keys play its slices, from C3 up; PITCH: the whole of it, chromatic.
  * EDIT 1  MODE  DIV  START  LEN   EDIT 2  CUT  SPEED  REV  BITS */
-#define GRB_N 24576u
+#define GRB_N 20480u
 #define GRB_RATE_Q16 16384u                               /* 11025 / 44100 */
 static int8_t grb_buf[GRB_N] __attribute__((section(".pool")));
 static volatile uint32_t grb_len, grb_w;
