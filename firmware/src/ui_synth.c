@@ -26,7 +26,8 @@ enum { X_LYMODE, X_LYSOUND, X_LYSPLIT, X_LYLEVEL, X_LYOCT, X_LYPAN, X_LYFILT, X_
        X_MIN, X_MOUT,                                  /* 1.0: GLO > MIDI, the instrument's channels (seq.c midi_in_ch) */
        X_MBEND, X_MLOCAL, X_MPROG, X_MCCO,             /* 1.0: the bend range (voice.c midi_bend), LOCAL, PROG, CC OUT */
        X_MBRTH,                                        /* 1.0: EWI (seq.c midi_breath) */
-       X_BMORPH, X_BSLOT, X_BSAVE, X_BLOAD,            /* BYTE MEM: MORPH, the memory A..D, capture into it, load it back */
+       X_BMORPH, X_BSLOT, X_BSAVE, X_BLOAD,
+       X_RFOOT, X_RVARY, X_RPOLY, X_RSPRD,             /* GLO > RHYTHM: footwork off / style, its variation; poly off / ratio, spread */            /* BYTE MEM: MORPH, the memory A..D, capture into it, load it back */
        X_COUNT };
 static void mseq_fill(struct track *t, uint32_t l, uint32_t f);
 static const char *const N_QFILL[] = {"--", "RAMP+", "RAMP-", "TRI", "SINE", "SQR", "RND", "FLAT", "INVRT", "SHIFT"};
@@ -52,6 +53,8 @@ static const char *const N_MBRTH[] = {"OFF", "VOL", "V+AT"};
 _Static_assert(X_MIN == 50 && X_MOUT == 51 && X_MBEND == 52 && X_MCCO == 55 && X_MBRTH == 56, "params.c PAGES: MIDI's ids");
 static param_desc_t xd_sound = {"SOUND", F_INT, 0, 0, 0, 0, 0};   /* (its range: the list's length, syn_desc) */
 static const char *const N_BSLOT[] = {"A", "B", "C", "D"};
+static const char *const N_RFOOT[] = {"OFF", "JUKE", "GHETTO", "ROLLS", "CHOP"};
+static const char *const N_RPOLY[] = {"OFF", "3:2", "3:4", "5:4", "7:4", "5:3", "7:5"};
 _Static_assert(X_BMORPH == 57, "params.c PAGES: BYTE MEM's ids");
 static const param_desc_t XD[X_COUNT] = {
     [X_LYMODE] = PE("MODE", N_LYMODE, LY_OFF),
@@ -103,6 +106,10 @@ static const param_desc_t XD[X_COUNT] = {
     [X_MLOCAL] = PE("LOCAL", N_ONOFF, 1),
     [X_MPROG] = PE("PROG", N_ONOFF, 1),
     [X_MCCO] = PE("SEND", N_MCCO, 0),
+    [X_RFOOT] = PE("FOOT", N_RFOOT, 0),
+    [X_RVARY] = PE("VARY", TN_FVR, 2),
+    [X_RPOLY] = PE("POLY", N_RPOLY, 0),
+    [X_RSPRD] = PE("SPREAD", TN_PSP, 1),
     [X_BMORPH] = PD("MORPH", F_INT, 0, 127, 0),
     [X_BSLOT] = PE("MEM", N_BSLOT, 0),
     [X_BSAVE] = PE("SAVE", N_GO, 0),
@@ -609,6 +616,10 @@ UI_SMALL static const param_desc_t *syn_desc(uint32_t id, int16_t **valp)
     case X_MPROG: xv[X_MPROG] = !midi_pc_off; *valp = &xv[X_MPROG]; break;
     case X_MCCO: xv[X_MCCO] = midi_cc_out != 0u; *valp = &xv[X_MCCO]; break;
     case X_BMORPH: *valp = &TSEL->p[P_E6]; break;
+    case X_RFOOT: tw_init(); xv[X_RFOOT] = ((tw_mask >> TW_FOOT) & 1u) ? (int16_t)(tw_p[TW_FOOT][0] + 1) : 0; *valp = &xv[X_RFOOT]; break;
+    case X_RVARY: tw_init(); xv[X_RVARY] = tw_p[TW_FOOT][1]; *valp = &xv[X_RVARY]; break;
+    case X_RPOLY: tw_init(); xv[X_RPOLY] = ((tw_mask >> TW_POLY) & 1u) ? (int16_t)(tw_p[TW_POLY][0] + 1) : 0; *valp = &xv[X_RPOLY]; break;
+    case X_RSPRD: tw_init(); xv[X_RSPRD] = tw_p[TW_POLY][1]; *valp = &xv[X_RSPRD]; break;
     case X_MBRTH: xv[X_MBRTH] = (int16_t)(midi_breath % 3u); *valp = &xv[X_MBRTH]; break;
     case X_QVAL:                                      /* (0.8) the selected step of the selected lane */
         xv[X_QVAL] = TSEL->ms[clamp(xv[X_QLANE], 1, 4) - 1][clamp(xv[X_QSTEP], 1, 16) - 1];
@@ -715,6 +726,22 @@ UI_SMALL static void syn_changed(uint32_t id, int16_t *vp)
             ui_message("A / B: TWO ENGINES");
         syn_morph_apply(*vp);
         break;
+    case X_RFOOT:
+    case X_RPOLY: {
+        uint32_t k = id == X_RFOOT ? TW_FOOT : TW_POLY;
+        tw_init();
+        if (*vp) {
+            tw_p[k][0] = (uint8_t)(*vp - 1);
+            tw_mask |= 1u << k;
+        } else {
+            tw_mask &= ~(1u << k);
+        }
+        tw_apply();
+        tw_cc_out();
+        break;
+    }
+    case X_RVARY: tw_p[TW_FOOT][1] = (uint8_t)*vp; break;
+    case X_RSPRD: tw_p[TW_POLY][1] = (uint8_t)*vp; break;
     case X_BMORPH:
         ui.lock_par = P_E6;                             /* (hold a step in SEQ: this is what it locks) */
         break;

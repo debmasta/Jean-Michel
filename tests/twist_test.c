@@ -139,6 +139,24 @@ int main(void)
         song.playing = 0; tw_mask = 0; tw_apply();
         { int same = 1; for (k = 0; k < 8u; k++) same &= trk[0].p[P_E0 + k] == e[k]; chk("off: the sound comes back exactly", same); }
     }
+    {   /* FOOTWORK and POLY */
+        uint32_t hits; int32_t was; uint32_t q;
+        quiet(); host_preset(&trk[0], ENGI_BYTE, 24); trk[0].p[P_AMODE] = 0;
+        tw_p[TW_FOOT][1] = 0; tw_p[TW_FOOT][0] = 0;
+        tw_mask = 1u << TW_FOOT; trk_note_on(&trk[0], 48, 100);
+        hits = 0; was = 0;
+        for (q = 0; q < 2000u; q++) { run(4); if (rhy[0].on && rhy[0].off > was) hits++; was = rhy[0].on ? rhy[0].off : 0; }
+        printf("  footwork: %u hits\n", hits);
+        chk("FOOTWORK plays hits on the held note", hits > 5u);
+        tw_mask = 0; run(40);
+        { uint32_t g = 0; for (k = 0; k < NVOICE; k++) g += trk[0].v[k].gate != 0; chk("off: the held note comes back", g >= 1u); }
+        trk_note_off(&trk[0], 48); run(3000); chk("released: nothing left", !live());
+        quiet(); host_preset(&trk[0], 0u, 0); trk[0].p[P_AMODE] = 0;
+        tw_p[TW_POLY][0] = 1; tw_mask = 1u << TW_POLY; trk_note_on(&trk[0], 48, 100); run(2000);
+        chk("POLY sounds on the two lanes", rhy[0].n == 48u || rhy[1].n == 60u);
+        tw_mask = 0; run(40); trk_note_off(&trk[0], 48); run(3000); chk("POLY off, released: nothing left", bounded() && !live());
+        tw_midi_cc(28, 127); chk("CC 28 sets the ratio", tw_p[TW_POLY][0] == 5u); tw_midi_cc(28, 30);
+    }
     printf("TWISTS: %s\n", nbad ? "FAIL" : "ok");
     return nbad != 0;
 }

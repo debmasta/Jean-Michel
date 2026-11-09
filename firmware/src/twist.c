@@ -4,10 +4,12 @@
  * takes RAM from the synth. Key 15 lets everything go, key 16 is the cats (ui_draw.c).
  * Runs in the audio ISR (tw_on, tw_off, tw_block) except the parts that change a parameter (tw_apply, the UI). */
 #if CLIPPER_SYNTH
+static uint8_t tw_last_on, tw_last_n, tw_last_v;   /* last note played: what FOOTWORK and POLY cut up while the sequencer runs */
+static void tw_cc_out(void);
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
        TW_ALLOFF, TW_CATS,
        /* page 2 (the first black keys pick the page) */
-       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_NUA, TW_N };
+       TW_BLFO, TW_TARP, TW_MUT, TW_SETA, TW_SETB, TW_RECCLR, TW_NUA, TW_FOOT, TW_POLY, TW_N };
 #define TW_NSC 19u
 static const int8_t TW_SC[TW_NSC][13] = {
     {0, 1, 3, 5, 7, 8, 10, -1}, {0, 2, 3, 7, 8, -1}, {0, 2, 4, 6, 8, 10, -1}, {0, 2, 3, 5, 7, 8, 10, -1}, {0, 3, 5, 7, 10, -1},
@@ -42,6 +44,10 @@ static const char *const TN_TSET[] = {"OCTS", "5THS", "DARK", "WIDE"};
 static const char *const TN_MUT[] = {"SOFT", "MID", "WILD"};
 static const char *const TN_NUA[] = {"HAIR", "SOFT", "MID"};
 static const char *const TN_NUM[] = {"FIXED", "EVOLVE", "RND"};
+static const char *const TN_FST[] = {"JUKE", "GHETTO", "ROLLS", "CHOP"};
+static const char *const TN_FVR[] = {"0", "25", "50", "75", "100"};
+static const char *const TN_PRT[] = {"3:2", "3:4", "5:4", "7:4", "5:3", "7:5"};
+static const char *const TN_PSP[] = {"SAME", "OCT", "5TH", "WIDE"};
 #define NN(a) (uint8_t)(sizeof(a) / sizeof(a[0]))
 static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_STUT] = {{"rate", NN(TN_STUT), 4, TN_STUT}},
@@ -61,10 +67,12 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_BLFO] = {{"form", 16, 0, TN_LAB}, {"dest", NN(TN_DEST), 0, TN_DEST}, {"depth", NN(TN_DEPTH), 2, TN_DEPTH}, {"speed", NN(TN_LRATE), 2, TN_LRATE}},
     [TW_TARP] = {{"set", NN(TN_TSET), 0, TN_TSET}, {"rate", NN(TN_ARATE), 2, TN_ARATE}},
     [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
+    [TW_FOOT] = {{"style", NN(TN_FST), 0, TN_FST}, {"vary", NN(TN_FVR), 2, TN_FVR}},
+    [TW_POLY] = {{"ratio", NN(TN_PRT), 1, TN_PRT}, {"spread", NN(TN_PSP), 1, TN_PSP}},
     [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "cats", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
 static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
@@ -170,6 +178,7 @@ static void tw_on(uint32_t note, uint32_t vel)
     track_t *t = &trk[0];
     int32_t m = (int32_t)note;
     uint32_t i;
+    tw_last_on = 1, tw_last_n = (uint8_t)note, tw_last_v = (uint8_t)vel;
     cat_q[cat_w & 7u] = (uint8_t)note;
     RING_PUBLISH();
     cat_w++;
@@ -228,6 +237,7 @@ static void tw_clear(void)
         tw_h[i].on = 0;
     for (i = 0; i < TW_NE; i++)
         tw_ev[i].stage = 0;
+    tw_last_on = 0;
 }
 /* every held note again: at its own pitch (STUT ROLL), or the next note of the chord (ARP) */
 static void tw_retrig(void)
@@ -318,6 +328,88 @@ static void tw_triple(uint32_t adv)
     }
     tp_on = 1;
     tp_step = (uint8_t)((tp_step + 1u) % 60u);
+}
+/* FOOTWORK and POLY: the note held (playing: the last note of the sequencer too) cut up by a rhythm generator, on the clock.
+ * FOOTWORK: a bar of 16 cells (rest, hit, roll of 2 3 4) that varies by itself; POLY: two lanes, A against B hits per two beats */
+static struct { uint8_t on, n; int32_t off; } rhy[2];
+static uint8_t rhy_mute;
+static uint32_t rhy_free, rhy_ftick = 0xFFFFFFFFu, rhy_bar, rhy_pi[2] = {0xFFFFFFFFu, 0xFFFFFFFFu};
+static void rhy_hit(uint32_t l, uint32_t note, uint32_t vel, int32_t gate)
+{
+    if (rhy[l].on)
+        trk_note_off0(&trk[0], rhy[l].n);
+    trk_note_on0(&trk[0], note, vel);
+    rhy[l].on = 1, rhy[l].n = (uint8_t)note, rhy[l].off = gate;
+}
+static void rhy_block(uint32_t adv)
+{
+    static const uint8_t PAT[4][16] = {{1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 2, 0},
+                                       {1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 3, 0, 1, 1, 0, 3},
+                                       {1, 0, 3, 0, 1, 0, 3, 3, 1, 2, 0, 3, 1, 0, 4, 4},
+                                       {1, 0, 0, 0, 2, 0, 0, 3, 0, 0, 1, 0, 2, 2, 3, 0}};
+    static const uint8_t RT[5][6] = {{0, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0}, {1, 0, 0, 1, 0, 0}, {1, 0, 1, 0, 1, 0}, {1, 1, 1, 1, 1, 1}};
+    static const uint8_t PA[6] = {3, 3, 5, 7, 5, 7}, PB[6] = {2, 4, 4, 4, 3, 5};
+    static const int8_t SP[4] = {0, 12, 7, 19};
+    uint32_t i, note = 0, vel = 100, have = 0, u;
+    for (i = 0; i < 2u; i++)
+        if (rhy[i].on && (rhy[i].off -= (int32_t)adv) <= 0) {
+            trk_note_off0(&trk[0], rhy[i].n);
+            rhy[i].on = 0;
+        }
+    for (i = 0; i < TW_NH && !tw_h[i].on; i++)
+        ;
+    if (i < TW_NH)
+        note = tw_h[i].out, vel = tw_h[i].vel, have = 1;
+    else if (song.playing && tw_last_on)
+        note = tw_last_n, vel = tw_last_v, have = 1;
+    if ((!tw_is(TW_FOOT) && !tw_is(TW_POLY)) || !have) {
+        if (rhy_mute) {
+            rhy_mute = 0;
+            if (i < TW_NH) {                         /* back to the note you hold */
+                tw_h[i].cur = tw_h[i].out;
+                trk_note_on0(&trk[0], tw_h[i].out, tw_h[i].vel);
+            }
+        }
+        rhy_pi[0] = rhy_pi[1] = rhy_ftick = 0xFFFFFFFFu;
+        return;
+    }
+    if (!rhy_mute) {
+        rhy_mute = 1;
+        if (i < TW_NH)
+            trk_note_off0(&trk[0], tw_h[i].cur);     /* the held note makes room: the rhythm plays it */
+    }
+    if (song.playing)
+        u = (uint32_t)(bb_Tnow >> 8);                /* T << 8 (Q28 beats >> 16 = T, 4096 a beat) */
+    else {
+        rhy_free += adv;
+        u = (uint32_t)(((uint64_t)rhy_free << 8 << 12) / BEAT_U);   /* (T's scale, 2^12 a beat, << 8) */
+    }
+    if (tw_is(TW_FOOT)) {
+        uint32_t tk = (u >> 8) * 24u / 4096u, sty = tw_v(TW_FOOT, 0), bar, st, sub, c, h;
+        if (tk != rhy_ftick) {
+            rhy_ftick = tk;
+            bar = tk / 96u, st = (tk % 96u) / 6u, sub = tk % 6u;
+            c = PAT[sty][st];
+            h = (st + 1u) * 2654435761u ^ (bar * 40503u + sty);
+            h ^= h >> 15;
+            if ((h * 2654435761u >> 24) % 100u < tw_v(TW_FOOT, 1) * 25u / 2u)   /* VARY: this cell goes elsewhere */
+                c = (h >> 7) % 5u;
+            if (RT[c][sub])
+                rhy_hit(0, note, sub ? vel * 3u / 4u + 1u : vel, tw_units(c > 1u ? 1 : 1, c > 1u ? 12 : 5));
+        }
+    }
+    if (tw_is(TW_POLY)) {
+        uint32_t r = tw_v(TW_POLY, 0), l, cyc = 2u * 4096u;
+        for (l = 0; l < 2u; l++) {
+            uint32_t a = l ? PB[r] : PA[r], k = (u >> 8) * a / cyc;
+            if (k != rhy_pi[l]) {
+                rhy_pi[l] = k;
+                if (!tw_is(TW_FOOT) || l)
+                    rhy_hit(l, (uint32_t)clamp((int32_t)note + (l ? SP[tw_v(TW_POLY, 1)] : 0), 0, 127), l ? vel * 4u / 5u + 1u : vel,
+                            tw_units(1, a + 1u));
+            }
+        }
+    }
 }
 /* once per control block, adv = its length in clock units */
 static void tw_block(uint32_t adv)
@@ -433,6 +525,7 @@ static void tw_block(uint32_t adv)
     }
     tw_bend = (semis + tw_cc_semi) * 4096;
     tw_triple(adv);
+    rhy_block(adv);
     {   /* BYTE LFO: a formula's bytes as a modulation, locked to the tempo */
         static uint32_t freeq;
         tw_lcut = tw_lshape = 0;
@@ -512,6 +605,18 @@ static void tw_apply(void)
 /* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
 static int tw_midi_cc(uint32_t cc, uint32_t v)
 {
+    if (cc == 26u || cc == 27u || cc == 28u || cc == 29u) {   /* FOOTWORK style, vary; POLY ratio, spread */
+        uint32_t k = cc < 28u ? TW_FOOT : TW_POLY, p = cc & 1u ? 1u : 0u;
+        tw_init();
+        tw_p[k][p] = (uint8_t)(v * TW_PAR[k][p].n / 128u);
+        return 1;
+    }
+    if (cc == 30u || cc == 31u) {
+        uint32_t b = 1u << (cc == 30u ? TW_FOOT : TW_POLY);
+        tw_init();
+        if (v >= 64u) tw_cc |= b; else tw_cc &= ~b;
+        return 1;
+    }
     if (cc == 85u || cc == 86u || cc == 118u || cc == 84u) {   /* the page 2 twists held: 118 BYTE LFO, 85 TRIPLE ARP, 86 MUTATE */
         uint32_t b = 1u << (cc == 118u ? TW_BLFO : cc == 85u ? TW_TARP : cc == 84u ? TW_NUA : TW_MUT);
         tw_init();
