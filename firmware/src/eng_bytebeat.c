@@ -46,6 +46,11 @@ static inline void bb_knobs(const int16_t *p, int32_t *var, int32_t *cut)
     }
 }
 
+/* Under load the formulas are worked out less often (the last sample is held: more lo-fi, no crackle): audio.c sets it from how
+ * full the last half was. 1 = every step */
+static volatile uint8_t bb_hold = 1;
+#define BB_HOLD_MAX 8u
+
 static void bb_note_on(track_t *t, voice_t *v)
 {
     (void)t;
@@ -60,7 +65,8 @@ static void bb_note_on(track_t *t, voice_t *v)
 static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vmod_t *m)
 {
     const int16_t *p = t->p;
-    uint32_t prog = (uint32_t)clamp(p[P_E0], 0, (int32_t)BB_N - 1), i;
+    uint32_t prog = (uint32_t)clamp(p[P_E0], 0, (int32_t)BB_N - 1), i, hold = bb_hold, wait = 0;
+    int needT;
     uint32_t mask = 0xFFu << (((uint32_t)clamp(p[P_E7], 0, 127) * 7u) / 127u);
     uint64_t tq = (uint64_t)v->ph[1] << 32 | v->ph[0];
     uint64_t step = ((uint64_t)m->inc * 125248u) >> 12;    /* 8000 steps a second at C4: 8000 / 261.6256 (Q12) */
@@ -72,6 +78,7 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
     bb_knobs(p, var, &cut);                            /* (noon, 64: 128, the original formula) */
     var[4] = var[5] = var[6] = var[7] = 0;
     var[9] = v->note;
+    needT = BB_PROG[prog].uses_T || var[3] != 128;     /* a formula without T only changes with t: at 120 BPM T alone would double the work */
     if (playing)
         Tq = bb_Tnow;
     else
@@ -82,7 +89,10 @@ static void bb_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const vm
         tsvf_coef(&f, cut, 0);
     for (i = 0; i < n; i++) {
         int32_t ti = (int32_t)(tq >> 32), Ti = (int32_t)(Tq >> 16), y;
-        if (ti != lt || Ti != lT) {
+        if (wait)
+            wait--;
+        else if (ti != lt || (needT && Ti != lT)) {
+            wait = hold - 1u;
             lt = ti;
             lT = Ti;
             var[8] = Ti;

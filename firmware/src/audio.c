@@ -80,6 +80,17 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
                 uint32_t pct = all / FM1_TICKS_PER_US * 100u / (HALF_FRAMES * 1000000u / FS);
                 if (pct > diag_peak)
                     diag_peak = pct;
+                {   /* BYTE: past 70 % the formulas ease off at once, they come back slowly */
+                    static uint8_t calm;
+                    if (pct > 70u) {
+                        calm = 0;
+                        if (bb_hold < BB_HOLD_MAX)
+                            bb_hold++;
+                    } else if (pct < 50u && bb_hold > 1u && ++calm >= 32u) {
+                        calm = 0;
+                        bb_hold--;
+                    }
+                }
             }
         }
         if (us > audio_max_us)

@@ -16,6 +16,12 @@ static int32_t bb_run(uint32_t prog, int32_t t, const int32_t *var)
     for (i = 0; i < n; i++) {
         uint32_t o = op[i];
         int32_t a, b, r = 0;
+        if (o >= 64u) {                                  /* a binary op with its right operand built in (gen_bytebeat.cpp): one dispatch instead of two */
+            b = o < 128u ? arg[i] : o < 192u ? t : var[arg[i]];
+            o &= 63u;
+            a = s[--sp];
+            goto bin;
+        }
         switch (o) {
         case BB_K: s[sp++] = arg[i]; continue;
         case BB_T: s[sp++] = t; continue;
@@ -34,6 +40,7 @@ static int32_t bb_run(uint32_t prog, int32_t t, const int32_t *var)
         }
         b = s[--sp];
         a = s[--sp];
+    bin:
         switch (o) {
         case BB_MUL: r = (int32_t)((uint32_t)a * (uint32_t)b); break;
         case BB_DIV: r = b == 0 || (a == BB_MIN && b == -1) ? 0 : a / b; break;
