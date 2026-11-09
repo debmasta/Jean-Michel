@@ -438,7 +438,6 @@ UI_SMALL static int big_page(const page_t *pg) { return pg->graph == GR_NONE && 
 #if CLIPPER_SYNTH
 UI_SMALL static int bb_sounding(const track_t *t, uint32_t *tv, uint32_t *n);
 static void graph_bytes(void);
-static uint16_t fl_bg(void);
 #endif
 UI_SMALL static uint32_t graph_signature(void)
 {
@@ -937,78 +936,20 @@ static void graph_arp(void)
 static const char *const CAT_ART[CAT_H] = {"..X..........X..", ".XXX........XXX.", ".XXXXXXXXXXXXXX.", ".XXXXXXXXXXXXXX.", "XXXooXXXXXXooXXX",
                                            "XXXooXXXXXXooXXX", "XXXXXXXXXXXXXXXX", "XXXXXXXppXXXXXXX", ".XXXXXXppXXXXXX.", ".XXpXXXXXXXXpXX.",
                                            "..XXpppppppXXX..", "...XXXXXXXXXX..."};
-/* The FLASHES, wherever you are: MORPH (BYTE) strobes the background of the graph, faster the further it is turned, its colour following
- * the knob; lightning crosses the screen while a twist is on or MORPH turned. Key "flash" in the FX window: on / off */
+/* The FX dot: a small red square in the head that blinks on the beat while a twist is on, wherever you are. Key "blink" in the FX window */
 static uint8_t fl_on = 1;
 static uint32_t fl_fx(void)
 {
     return (tw_mask | tw_cc | tw_auto_now | tw_ch | tw_rm) & ~(1u << TW_GRAB | 1u << TW_ALLOFF | 1u << TW_CATS | 1u << TW_SETA | 1u << TW_SETB | 1u << TW_RECCLR);
 }
-static uint32_t fl_morph(void) { return fl_on && TSEL->eng_req == ENGI_BYTE ? (uint32_t)clamp(TSEL->p[P_E6], 0, 127) : 0u; }
-static uint16_t fl_strobe(uint32_t v)                    /* MORPH's colour this instant; black in the off half of its strobe */
+static void fl_dot(void)
 {
-    uint32_t m = fl_morph(), per;
-    if (!m)
-        return C_BLACK;
-    per = 400u - m * 340u / 127u;
-    return fm1_ms % per < per / 2u ? bb_hue(m * 2u + bb_force * 64u, v) : C_BLACK;
-}
-static uint8_t fl_bolt, fl_two;                          /* frames of lightning left; two bolts */
-static uint16_t fl_bg(void) { return fl_on && fl_bolt == 2u ? C_WHITE : fl_strobe(200u); }
-static uint32_t fl_rnd(uint32_t *r) { *r ^= *r << 13; *r ^= *r >> 17; *r ^= *r << 5; return *r >> 3; }
-static void fl_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t hw, uint16_t c)
-{
-    int32_t y;
-    for (y = y0; y < y1 && y < 240; y += 6) {
-        int32_t x = clamp(x0 + (x1 - x0) * (y - y0) / (y1 - y0) - hw, 0, 239 - 2 * hw);
-        lcd_fill((uint32_t)x, (uint32_t)y, (uint32_t)(2 * hw + 1), y + 6 > 240 ? (uint32_t)(240 - y) : 6u, c);
-    }
-}
-static void fl_zap(uint32_t seed, int32_t hw, uint16_t c)   /* a bolt from the top: the same seed, the same zigzag and its fork */
-{
-    uint32_t r = seed | 1u;
-    int32_t x = 20 + (int32_t)(fl_rnd(&r) % 200u), y = 0, forked = 0;
-    while (y < 240) {
-        int32_t ny = y + 14 + (int32_t)(fl_rnd(&r) % 24u), nx = clamp(x + (int32_t)(fl_rnd(&r) % 61u) - 30, 4, 235);
-        fl_line(x, y, nx, ny, hw, c);
-        if (!forked && y > 40 && !(fl_rnd(&r) & 3u)) {
-            forked = 1;
-            fl_line(nx, ny, clamp(nx + (int32_t)(fl_rnd(&r) % 121u) - 60, 4, 235), ny + 60, hw, c);
-        }
-        x = nx, y = ny;
-    }
-}
-/* LIGHTNING, while something flashes: on the notes (one in two) and, with MORPH, by itself the more it is turned. Three frames, a white
- * burst behind the graph on the first, then the page is drawn again */
-static void fl_lightning(uint32_t active, uint32_t m)
-{
-    static uint8_t seen;
-    static uint32_t rs = 0x9E3779B9u, seed, last;
-    uint8_t n = fl_note;
-    uint32_t got = n != seen, r;
-    seen = n;
-    if (!fl_bolt) {
-        if (!fl_on || !active || fm1_ms - last < 150u)
-            return;
-        r = fl_rnd(&rs) + fm1_ms;
-        if (!((got && (r & 1u)) || ((r >> 4) & 255u) < m / 3u))
-            return;
-        seed = fl_rnd(&rs);
-        fl_bolt = 3;
-        fl_two = m > 90u || __builtin_popcount(active) >= 3;
-    }
-    {
-        uint32_t k;
-        for (k = 0; k <= fl_two; k++) {
-            fl_zap(seed + k * 7919u, 2, bb_hue(seed >> 8 + k, 255u));
-            fl_zap(seed + k * 7919u, 0, C_WHITE);
-        }
-    }
-    if (!--fl_bolt) {
-        last = fm1_ms;
-        lcd_fill(0, 0, 240, 240, C_BLACK);               /* (as every screen change does: no frame of the page keeps a trace) */
-        ui.force = 1;
-    }
+    static uint8_t shown = 2;
+    uint32_t ph = song.playing ? (uint32_t)(bb_Tnow >> 27) : fm1_ms / 250u;
+    uint8_t on = (uint8_t)(fl_on && fl_fx() && !(ph & 1u));
+    if (on || shown != on)
+        lcd_fill(198, 6, 6, 6, on ? TE_RED : C_BLACK);
+    shown = on;
 }
 #endif
 /* Clipper: HOME, the instrument: the sound's name large, its kind and place in the list, its engine; the
@@ -1104,16 +1045,11 @@ UI_SMALL static void draw_graph(void)
     }
     sig = graph_signature();
 #if CLIPPER_SYNTH
-    sig ^= (uint32_t)fl_bg() * 2166136261u;           /* the MORPH strobe behind the graph */
 #endif
     if (!ui.force && sig == ui.graph_sig)
         return;
     ui.graph_sig = sig;
-#if CLIPPER_SYNTH
-    cv_begin(240, H_GRAPH, fl_bg());
-#else
     cv_begin(240, H_GRAPH, C_BLACK);
-#endif
     cv_oy = G_OY;
     if (ui.home && CLIPPER_SYNTH) {
         cv_oy = 0;
@@ -1471,7 +1407,7 @@ UI_SMALL static void ui_draw(void)
         tw_chaos_key = 0xFF;
         tw_mask &= ~(1u << TW_CHAOS);
     }
-    fl_lightning(fl_fx() | (fl_morph() ? 1u << 31 : 0u), tw_ch ? 127u : fl_morph());
+    fl_dot();
 #endif
 }
 UI_SMALL static void ui_draw_page(void)

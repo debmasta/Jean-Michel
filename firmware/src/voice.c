@@ -290,6 +290,12 @@ static int32_t glide_ticks(int32_t g)                    /* control ticks of TIM
  * GLIDE RND (only some notes glide), DRIFT (each voice's pitch wanders by itself). No voice more than the part already uses */
 static uint8_t rmx_drop;                                 /* REMIX (twist.c): the notes a moment dropped: 1 the melodic parts, 2 the drums too */
 static uint8_t vt_flam[NPART], vt_stack[NPART], vt_grnd[NPART], vt_drift[NPART];
+/* VOICE 5: ACCENT (the velocity opens the filter, the soft notes stay dark), OCT JUMP (now and then a note an octave up, rarely down),
+ * VEL RND (the velocity shaken, a played feel). The jumped notes are remembered for their note-off */
+static uint8_t vt_acc[NPART], vt_ojmp[NPART], vt_vrnd[NPART];
+static int8_t vt_jm[NPART][128];
+static uint32_t vt_seed = 0x6C8E9CF5u;
+static uint32_t vt_rnd(uint32_t n) { vt_seed ^= vt_seed << 13; vt_seed ^= vt_seed >> 17; vt_seed ^= vt_seed << 5; return (vt_seed >> 8) % n; }
 static uint32_t vt_tick;                                 /* control blocks (twist.c tw_block) */
 static struct { uint8_t left, note, vel, glide; } vt_fl[NPART][NVOICE];
 static inline uint32_t vt_part(const track_t *t) { return (uint32_t)(t - trk) % NPART; }
@@ -848,6 +854,20 @@ static void trk_note_off0(track_t *t, uint32_t note)
 static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
 {
 #if CLIPPER_SYNTH
+    {
+        uint32_t pi = (uint32_t)(t - trk);
+        if (pi < NPART && note < 128u && !is_drum(t)) {
+            int32_t j = 0;
+            if (vt_ojmp[pi] && vt_rnd(127) < vt_ojmp[pi])
+                j = vt_rnd(4) ? 12 : -12;
+            if (note + (uint32_t)j > 127u)
+                j = 0;
+            vt_jm[pi][note] = (int8_t)j;
+            note = (uint32_t)((int32_t)note + j);
+            if (vt_vrnd[pi] && vel)
+                vel = (uint32_t)clamp((int32_t)vel + (int32_t)vt_rnd(2u * vt_vrnd[pi] / 3u + 1u) - (int32_t)vt_vrnd[pi] / 3, 1, 127);
+        }
+    }
     if (t == &trk[0] && note < 128u) {
         tw_init();
         tw_on(note, vel);
@@ -859,6 +879,14 @@ static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
 static void trk_note_off(track_t *t, uint32_t note)
 {
 #if CLIPPER_SYNTH
+    {
+        uint32_t pi = (uint32_t)(t - trk);
+        if (pi < NPART && note < 128u && vt_jm[pi][note]) {
+            int32_t j = vt_jm[pi][note];
+            vt_jm[pi][note] = 0;
+            note = (uint32_t)((int32_t)note + j);
+        }
+    }
     if (t == &trk[0] && note < 128u) {
         tw_off(note);
         return;
@@ -1652,6 +1680,10 @@ static uint32_t track_render(track_t *t, int32_t *out, uint32_t n)
             int32_t a = e == &ENG_HYBRID ? 0 : v->pat > cat ? v->pat : cat;
             if (p[P_VELF])
                 m.cutoff += ((int32_t)v->vel - 96) * p[P_VELF] * 4;
+#if CLIPPER_SYNTH
+            if ((uint32_t)(t - trk) < NPART && vt_acc[t - trk])
+                m.cutoff += ((int32_t)v->vel - 90) * vt_acc[t - trk] * 5;   /* ACCENT */
+#endif
             if (p[P_MWDST] == MD_CUT)
                 m.cutoff += mw * 120;
             if (p[P_ATDST] == MD_CUT)

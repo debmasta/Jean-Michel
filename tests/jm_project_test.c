@@ -27,6 +27,11 @@ int main(void)
         chk(bb_run(BB_N + 2u, 5, var) == 15, "SysEx: it plays");
         bbu_save(); memset(bb_user, 0, sizeof bb_user); bbu_loaded = 0; bbu_load();
         chk(bb_run(BB_N + 2u, 5, var) == 15, "flash: back after a restart");
+        tw_init(); tw_p[TW_FOOT][0] = 3; tw_p[TW_POLY][0] = 4; bbu_save();
+        tw_p[TW_FOOT][0] = 0; tw_p[TW_POLY][0] = 0; bbu_loaded = 0; bbu_load();
+        chk(tw_p[TW_FOOT][0] == 3u && tw_p[TW_POLY][0] == 4u, "flash: the FX settings back");
+        chk(bb_run(BB_N + 2u, 5, var) == 15, "flash: the formula still there");
+        vt_acc[0] = 77; project_save(1); vt_acc[0] = 0; transport_req = 0; project_load(1); chk(vt_acc[0] == 77u, "project: VOICE 5 back");
         f[5] = 80; chk(!bbu_rx(f, 25u), "SysEx: wrong length refused");
     }
     printf("JM PROJECT: %s\n", fails ? "FAILED" : "ok");

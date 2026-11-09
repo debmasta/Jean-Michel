@@ -631,7 +631,7 @@ UI_SMALL static const int8_t *proj_x10_of(const project_t *p)   /* p's 1.0 block
 typedef struct {
     uint32_t magic, sum;
     uint8_t snap[4][5], have, rsv[3];
-    uint8_t flam[NPART], stack[NPART], grnd[NPART], drift[NPART];
+    uint8_t flam[NPART], stack[NPART], grnd[NPART], drift[NPART], acc[NPART], ojmp[NPART], vrnd[NPART];
     uint32_t chk;
 } proj_jm_t;
 static proj_jm_t proj_jms[PROJ_X10_N] __attribute__((section(".pool")));
@@ -645,6 +645,7 @@ UI_SMALL static void proj_jm_fill(proj_jm_t *j, uint32_t sum)
         for (b = 0; b < 5u; b++)
             j->snap[a][b] = (uint8_t)clamp(bb_snap[a][b], 0, 127);
     memcpy(j->flam, vt_flam, NPART), memcpy(j->stack, vt_stack, NPART), memcpy(j->grnd, vt_grnd, NPART), memcpy(j->drift, vt_drift, NPART);
+    memcpy(j->acc, vt_acc, NPART), memcpy(j->ojmp, vt_ojmp, NPART), memcpy(j->vrnd, vt_vrnd, NPART);
     j->chk = proj_hash(j, sizeof *j - 4u);
 }
 UI_SMALL static void proj_jm_apply(const project_t *p)   /* a project put in place by hand or at power-on: its own, or none */
@@ -654,6 +655,7 @@ UI_SMALL static void proj_jm_apply(const project_t *p)   /* a project put in pla
     if (!proj_jm_valid(j) || j->sum != p->sum) {
         bb_have = 0;
         memset(vt_flam, 0, NPART), memset(vt_stack, 0, NPART), memset(vt_grnd, 0, NPART), memset(vt_drift, 0, NPART);
+        memset(vt_acc, 0, NPART), memset(vt_ojmp, 0, NPART), memset(vt_vrnd, 0, NPART);
         return;
     }
     bb_have = j->have & 15u;
@@ -663,6 +665,7 @@ UI_SMALL static void proj_jm_apply(const project_t *p)   /* a project put in pla
     for (a = 0; a < NPART; a++) {
         vt_flam[a] = (uint8_t)(j->flam[a] & 127u), vt_stack[a] = (uint8_t)(j->stack[a] & 3u);
         vt_grnd[a] = (uint8_t)(j->grnd[a] & 127u), vt_drift[a] = (uint8_t)(j->drift[a] & 127u);
+        vt_acc[a] = (uint8_t)(j->acc[a] & 127u), vt_ojmp[a] = (uint8_t)(j->ojmp[a] & 127u), vt_vrnd[a] = (uint8_t)(j->vrnd[a] & 127u);
     }
 }
 #endif

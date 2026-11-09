@@ -176,6 +176,16 @@ int main(void)
         chk("GLIDE RND at the top: the note glides", t->v[0].pitch_cur != t->v[0].pitch16);
         trk_note_off(t, 60); vt_grnd[0] = 0; t->p[P_VOICE] = 0; run(3000); chk("GLIDE RND released: nothing left", !live());
     }
+    {   /* VOICE 5 */
+        track_t *t = &trk[0]; uint32_t q, up = 0;
+        quiet(); host_preset(t, 0u, 0); t->p[P_AMODE] = 0; t->p[P_VOICE] = 0;
+        vt_ojmp[0] = 127;
+        for (q = 0; q < 40u; q++) { trk_note_on(t, 60, 100); run(2); up += t->v[0].note != 60u || t->v[1].note == 72u || t->v[1].note == 48u; trk_note_off(t, 60); run(400); }
+        chk("OCTJMP: notes jump", up > 10u);
+        chk("OCTJMP: every jumped note let go", !live());
+        vt_ojmp[0] = 0; vt_vrnd[0] = 127; trk_note_on(t, 60, 100); trk_note_off(t, 60); run(3000); chk("VELRND: nothing left", !live()); vt_vrnd[0] = 0;
+        tw_midi_cc(56, 100); chk("CC 56: ACCENT", vt_acc[0] == 100u); vt_acc[0] = 0;
+    }
     {   /* user formulas: the checks */
         static bb_user_t u; int32_t var[10] = {128, 128, 128, 128};
         static const uint8_t OK[] = {BB_T, BB_K, BB_MUL}, UND[] = {BB_K, BB_MUL}, BADV[] = {BB_V}; static const int32_t OKA[] = {0, 3, 0}, UA[] = {1, 0}, VA[] = {99};

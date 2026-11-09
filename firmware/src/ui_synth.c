@@ -29,6 +29,7 @@ enum { X_LYMODE, X_LYSOUND, X_LYSPLIT, X_LYLEVEL, X_LYOCT, X_LYPAN, X_LYFILT, X_
        X_BMORPH, X_BSLOT, X_BSAVE, X_BLOAD,
        X_RFOOT, X_RVARY, X_RPOLY, X_RSPRD, /* 61.. */             /* GLO > RHYTHM: footwork off / style, its variation; poly off / ratio, spread */            /* BYTE MEM: MORPH, the memory A..D, capture into it, load it back */
        X_VFLAM, X_VSTACK, X_VGRND, X_VDRIFT,           /* EDIT > VOICE 4 (voice.c), per part */
+       X_VACC, X_VOJMP, X_VVRND,                       /* VOICE 5 */
        X_COUNT };
 static void mseq_fill(struct track *t, uint32_t l, uint32_t f);
 static const char *const N_QFILL[] = {"--", "RAMP+", "RAMP-", "TRI", "SINE", "SQR", "RND", "FLAT", "INVRT", "SHIFT"};
@@ -112,6 +113,9 @@ static const param_desc_t XD[X_COUNT] = {
     [X_VSTACK] = PE("STACK", N_VSTACK, 0),
     [X_VGRND] = PD("GLRND", F_PCT, 0, 127, 0),
     [X_VDRIFT] = PD("DRIFT", F_PCT, 0, 127, 0),
+    [X_VACC] = PD("ACCNT", F_PCT, 0, 127, 0),
+    [X_VOJMP] = PD("OCTJMP", F_PCT, 0, 127, 0),
+    [X_VVRND] = PD("VELRND", F_PCT, 0, 127, 0),
     [X_RFOOT] = PE("FOOT", N_RFOOT, 0),
     [X_RVARY] = PE("VARY", TN_FVR, 2),
     [X_RPOLY] = PE("POLY", N_RPOLY, 0),
@@ -626,6 +630,9 @@ UI_SMALL static const param_desc_t *syn_desc(uint32_t id, int16_t **valp)
     case X_VSTACK: xv[X_VSTACK] = vt_stack[vt_part(TSEL)]; *valp = &xv[X_VSTACK]; break;
     case X_VGRND: xv[X_VGRND] = vt_grnd[vt_part(TSEL)]; *valp = &xv[X_VGRND]; break;
     case X_VDRIFT: xv[X_VDRIFT] = vt_drift[vt_part(TSEL)]; *valp = &xv[X_VDRIFT]; break;
+    case X_VACC: xv[X_VACC] = vt_acc[vt_part(TSEL)]; *valp = &xv[X_VACC]; break;
+    case X_VOJMP: xv[X_VOJMP] = vt_ojmp[vt_part(TSEL)]; *valp = &xv[X_VOJMP]; break;
+    case X_VVRND: xv[X_VVRND] = vt_vrnd[vt_part(TSEL)]; *valp = &xv[X_VVRND]; break;
     case X_RFOOT: tw_init(); xv[X_RFOOT] = ((tw_mask >> TW_FOOT) & 1u) ? (int16_t)(tw_p[TW_FOOT][0] + 1) : 0; *valp = &xv[X_RFOOT]; break;
     case X_RVARY: tw_init(); xv[X_RVARY] = tw_p[TW_FOOT][1]; *valp = &xv[X_RVARY]; break;
     case X_RPOLY: tw_init(); xv[X_RPOLY] = ((tw_mask >> TW_POLY) & 1u) ? (int16_t)(tw_p[TW_POLY][0] + 1) : 0; *valp = &xv[X_RPOLY]; break;
@@ -754,6 +761,9 @@ UI_SMALL static void syn_changed(uint32_t id, int16_t *vp)
     case X_VSTACK: vt_stack[vt_part(TSEL)] = (uint8_t)*vp; break;
     case X_VGRND: vt_grnd[vt_part(TSEL)] = (uint8_t)*vp; break;
     case X_VDRIFT: vt_drift[vt_part(TSEL)] = (uint8_t)*vp; break;
+    case X_VACC: vt_acc[vt_part(TSEL)] = (uint8_t)*vp; break;
+    case X_VOJMP: vt_ojmp[vt_part(TSEL)] = (uint8_t)*vp; break;
+    case X_VVRND: vt_vrnd[vt_part(TSEL)] = (uint8_t)*vp; break;
     case X_RVARY: tw_p[TW_FOOT][1] = (uint8_t)*vp; break;
     case X_RSPRD: tw_p[TW_POLY][1] = (uint8_t)*vp; break;
     case X_BMORPH:

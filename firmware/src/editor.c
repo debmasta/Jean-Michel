@@ -1280,28 +1280,45 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
 #if CLIPPER_SYNTH
 /* the formulas of FM-1 PAD: F0 7D 4A 4D 42 slot n nstr, n x (op, arg in five 7-bit groups), nstr x (two nibbles) F7. The last flash sector
  * below the settings holds them, one copy */
-#define BBU_MAGIC 0x31554242u
+#define BBU_MAGIC 0x31554242u                         /* the formulas alone */
+#define BBU_MAGIC2 0x32554242u                        /* then the FX window's settings (twist.c tw_p) */
+static uint32_t bbu_tw_hash, bbu_tw_ms;
 #define BBU_OFF 0xFB000u
 static uint8_t bbu_dirty, bbu_loaded;
+static uint32_t bbu_twh(void) { return st_crc32(tw_p, sizeof tw_p); }
 UI_SMALL static void bbu_load(void)
 {
-    static uint32_t h[2];
+    static uint32_t h[3];
+    uint32_t k, q;
     if (bbu_loaded || !flash_ok)
         return;
     bbu_loaded = 1;
-    if (st_read(BBU_OFF, h, sizeof h) || h[0] != BBU_MAGIC)
+    tw_init();
+    if (st_read(BBU_OFF, h, sizeof h) || (h[0] != BBU_MAGIC && h[0] != BBU_MAGIC2))
         return;
-    if (!st_read(BBU_OFF + 8u, bb_user, sizeof bb_user) && st_crc32(bb_user, sizeof bb_user) == h[1])
+    if (h[0] == BBU_MAGIC2) {
+        static uint8_t tp[TW_N][TW_NP];
+        if (!st_read(BBU_OFF + 12u + sizeof bb_user, tp, sizeof tp) && st_crc32(tp, sizeof tp) == h[2]) {
+            for (k = 0; k < TW_N; k++)
+                for (q = 0; q < TW_NP; q++)
+                    if (tp[k][q] < TW_PAR[k][q].n)
+                        tw_p[k][q] = tp[k][q];
+        }
+    }
+    bbu_tw_hash = bbu_twh();
+    if (!st_read(BBU_OFF + (h[0] == BBU_MAGIC2 ? 12u : 8u), bb_user, sizeof bb_user) && st_crc32(bb_user, sizeof bb_user) == h[1])
         return;
     memset(bb_user, 0, sizeof bb_user);
 }
 UI_SMALL static void bbu_save(void)
 {
-    static uint32_t h[2];
-    _Static_assert(sizeof bb_user + 8u <= 4096u, "one sector");
+    static uint32_t h[3];
+    _Static_assert(sizeof bb_user + sizeof tw_p + 12u <= 4096u, "one sector");
     bbu_dirty = 0;
-    h[0] = BBU_MAGIC, h[1] = st_crc32(bb_user, sizeof bb_user);
-    if (st_erase(BBU_OFF) || st_prog(BBU_OFF, h, sizeof h) || st_prog(BBU_OFF + 8u, bb_user, sizeof bb_user))
+    bbu_tw_hash = bbu_twh();
+    h[0] = BBU_MAGIC2, h[1] = st_crc32(bb_user, sizeof bb_user), h[2] = bbu_tw_hash;
+    if (st_erase(BBU_OFF) || st_prog(BBU_OFF, h, sizeof h) || st_prog(BBU_OFF + 12u, bb_user, sizeof bb_user) ||
+        st_prog(BBU_OFF + 12u + sizeof bb_user, tw_p, sizeof tw_p))
         ui_message("U SAVE ERROR");
 }
 UI_SMALL static int bbu_rx(const uint8_t *p, uint32_t len)
@@ -1336,6 +1353,12 @@ UI_SMALL static void ed_service(void)
     uint32_t n;
 #if CLIPPER_SYNTH
     bbu_load();
+    if (bbu_loaded && bbu_twh() != bbu_tw_hash) {          /* the FX settings changed: kept 4 s after the last change */
+        bbu_tw_hash = bbu_twh();
+        bbu_tw_ms = fm1_ms | 1u;
+    }
+    if (bbu_tw_ms && fm1_ms - bbu_tw_ms > 4000u)
+        bbu_tw_ms = 0, bbu_dirty = 1;
     if (bbu_dirty && flash_ok && !song.playing && !transport_req)
         bbu_save();                                         /* (a sector erase stops the audio for ~50 ms: never while it plays) */
     if (ota_frame_get(&p, &n) && n >= 7u && p[0] == 0x7Du && p[1] == 0x4Au && p[2] == 0x4Du && p[3] == 0x42u) {

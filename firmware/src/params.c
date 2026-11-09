@@ -554,6 +554,7 @@ static const page_t PAGES[] = {
     {"VOICE 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_ALLOC, P_DETUNE, P_PAN, P_VINT}},   /* (0.9: VINTAGE) */
     {"VOICE 3", FAM_EDIT, SC_TRACK, GR_NONE, {P_SPREAD, 0xFF, 0xFF, 0xFF}},      /* (1.0: SPREAD) */
     {"VOICE 4", FAM_EDIT, SC_SYN, GR_NONE, {65, 66, 67, 68}},    /* X_VFLAM X_VSTACK X_VGRND X_VDRIFT (voice.c) */
+    {"VOICE 5", FAM_EDIT, SC_SYN, GR_NONE, {69, 70, 71, 0xFF}},  /* X_VACC X_VOJMP X_VVRND */
     {"MACROS", FAM_EDIT, SC_TRACK, GR_NONE, {P_MAC1, P_MAC2, P_MAC3, P_MAC4}},   /* (1.0) */
     {"LAYER", FAM_EDIT, SC_SYN, GR_LAYER, {0, 1, 2, 3}},         /* X_LYMODE X_LYSOUND X_LYSPLIT X_LYLEVEL */
     {"LAYER 2", FAM_EDIT, SC_SYN, GR_LAYER, {4, 5, 6, 7}},       /* X_LYOCT X_LYPAN X_LYFILT X_LYSWAP */

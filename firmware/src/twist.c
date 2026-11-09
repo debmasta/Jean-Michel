@@ -4,7 +4,6 @@
  * takes RAM from the synth. Key 15 lets everything go, key 16 is the screen flashes (ui_draw.c).
  * Runs in the audio ISR (tw_on, tw_off, tw_block) except the parts that change a parameter (tw_apply, the UI). */
 #if CLIPPER_SYNTH
-static volatile uint8_t fl_note;                  /* counts the notes: a lightning cue for the screen (ui_draw.c) */
 static uint8_t tw_last_on, tw_last_n, tw_last_v;   /* last note played: what FOOTWORK and POLY cut up while the sequencer runs */
 static void tw_cc_out(void);
 enum { TW_STUT, TW_ROLL, TW_ARP, TW_OCT, TW_GLIDE, TW_SDL, TW_SCALE, TW_STAIR, TW_PDN, TW_PUP, TW_FDN, TW_FUP, TW_THROW, TW_SPEED,
@@ -76,7 +75,7 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
 };
 static const char *const TW_LAB[TW_N] = {"stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+",
-                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "flash", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly", "CHAOS", "remix", "grab"};
+                                         "filt-", "filt+", "throw", "speed", "ALL OFF", "blink", "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly", "CHAOS", "remix", "grab"};
 static volatile uint32_t tw_mask;                /* the twists on */
 static uint8_t tw_sel;                           /* the one the knobs edit */
 static uint8_t tw_page;                          /* which 16 the white keys show (black keys 1, 2) */
@@ -180,7 +179,6 @@ static void tw_on(uint32_t note, uint32_t vel)
     int32_t m = (int32_t)note;
     uint32_t i;
     tw_last_on = 1, tw_last_n = (uint8_t)note, tw_last_v = (uint8_t)vel;
-    fl_note++;
     if (tw_is(TW_MUT)) {                         /* MUTATE: this note, the sound's numbers thrown around where they are */
         static const uint8_t R[3] = {10, 28, 64};
         const engine_t *e = ENGINES[t->engine % NENGINES];
@@ -676,6 +674,11 @@ static int tw_midi_cc(uint32_t cc, uint32_t v)
         uint32_t k = cc < 28u ? TW_FOOT : TW_POLY, p = cc & 1u ? 1u : 0u;
         tw_init();
         tw_p[k][p] = (uint8_t)(v * TW_PAR[k][p].n / 128u);
+        return 1;
+    }
+    if (cc >= 52u && cc <= 58u) {                 /* VOICE 4 / 5 of the first part: FLAM STACK GLRND DRIFT ACCENT OCTJMP VELRND */
+        uint8_t *const W[7] = {vt_flam, vt_stack, vt_grnd, vt_drift, vt_acc, vt_ojmp, vt_vrnd};
+        W[cc - 52u][0] = (uint8_t)(cc == 53u ? v * 4u / 128u : v);
         return 1;
     }
     if (cc == 89u || cc == 90u) {                 /* REMIX every, wild */

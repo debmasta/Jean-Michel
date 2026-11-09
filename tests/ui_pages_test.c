@@ -974,13 +974,12 @@ int main(int argc, char **argv)
         #undef R
     }
 #if CLIPPER_SYNTH
-    {   /* the flashes: MORPH strobes the background */
+    {   /* the FX dot */
         uint32_t q, seen = 0;
         tw_init(); ui.home = 0; ui.layer = LY_PLAY;
-        TSEL->eng_req = ENGI_BYTE; TSEL->p[P_E6] = 127;
-        for (q = 0; q < 12u; q++) { frame(); if (screen[120 * 240 + 1] != 0) { seen++; if (seen == 1u) ppm("flash_morph"); } }
-        check(seen > 0u && seen < 12u, "flash: MORPH strobes");
-        TSEL->p[P_E6] = 0; frame(); frame();
+        tw_mask = 1u << TW_FOOT; for (q = 0; q < 40u; q++) { frame(); seen += screen[8 * 240 + 200] != 0; }
+        check(seen > 0u && seen < 40u, "FX dot: blinks while a twist is on");
+        tw_mask = 0; frames(4); check(screen[8 * 240 + 200] == 0, "FX dot: gone when nothing is on"); ppm("fx_dot_off");
         {   /* the ARP page: background, animal, every MODE draws within the screen; BYTE's skull */
             uint32_t pi, m; static const char *const NM[4] = {"arp_up", "arp_dn", "arp_updn", "arp_rnd"};
             ui.force = 1; ui.home = 1; frames(3); ppm("byte_home");
@@ -989,27 +988,6 @@ int main(int argc, char **argv)
             for (m = 0; m < 16u; m++) { TSEL->p[P_AMODE] = (int16_t)m; frames(4); if (m >= 1u && m <= 4u) ppm(NM[m - 1u]); }
             { uint32_t lit = 0, x; TSEL->p[P_AMODE] = 1; frames(4); for (x = 0; x < 240u; x++) lit += screen[100 * 240 + x] != 0; check(lit > 40u, "ARP page: the background"); }
             TSEL->p[P_AMODE] = 0; ui.home = 1; frames(3);
-        }
-        {   /* lightning leaves no trace: on a page, in a layer, in the menu */
-            static uint16_t snap[240 * 240];
-            uint32_t w, d, x;
-            for (w = 0; w < 3u; w++) {
-                go_home(); frames(4);
-                if (w == 1u) { press(B_FX); frames(24); }
-                if (w == 2u) { ui.menu = 1; ui.force = 1; frames(4); }
-                memcpy(snap, screen, sizeof snap);
-                fl_bolt = 3; fl_two = 1;
-                frame();
-                if (w == 0u) ppm("flash_bolt");
-                for (d = 0, x = 0; x < 240u * 240u; x++) d += screen[x] != snap[x];
-                check(d > 300u, "lightning: drawn");
-                frames(8);
-                for (d = 0, x = 0; x < 240u * 240u; x++) d += screen[x] != snap[x];
-                printf("  diff after %u: %u\n", w, d);
-                check(d == 0u, "lightning: leaves no trace");
-                if (w == 1u) { release(B_FX); frames(4); }
-                if (w == 2u) { ui.menu = 0; ui.force = 1; frames(4); }
-            }
         }
     }
 #endif
