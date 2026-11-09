@@ -168,6 +168,17 @@ UI_SMALL static void draw_column(uint32_t c, const char *label, const char *val,
         return;
     str_cpy(ui.col[c], key, sizeof ui.col[c]);
     cv_begin(55, Y_SEP_END - Y_LABEL, C_BLACK);         /* x 4..58: the rule at 59 stays */
+#if CLIPPER_SYNTH
+    if (l[0] >= 'A' && l[0] <= 'D' && !l[1] && TSEL->eng_req == ENGI_BYTE && (ui.home || cur_page()->scope == SC_ENGINE)) {
+        /* BYTE's A B C D: a laughing skull, a flame, a spider, the skull */
+        static const uint16_t G[4][12] = {{0x3FC,0x7FE,0xE67,0xE67,0xFFF,0x79E,0x3FC,0x2AC,0x1F8,0x168,0x000,0x000}, {0x040,0x060,0x0E0,0x0F4,0x1FC,0x3DC,0x39E,0x70E,0x76E,0x7FE,0x3FC,0x1F8}, {0x891,0x492,0x2F4,0x1F8,0xF9F,0x1F8,0xEF7,0x2F4,0x462,0x402,0x801,0x000}, {0x3FC,0x7FE,0xE67,0xE67,0xFFF,0x79E,0x3FC,0x2AC,0x1F8,0x168,0x000,0x000}};
+        uint32_t gy, gx;
+        for (gy = 0; gy < 12u; gy++)
+            for (gx = 0; gx < 12u; gx++)
+                if ((G[l[0] - 'A'][gy] >> (11u - gx)) & 1u)
+                    cv_rect((int32_t)gx, (int32_t)gy, 1, 1, TE_COL[c & 3u]);
+    } else
+#endif
     if (FELUCCA_ICONS && icon != ICON_NONE && l[0])
         cv_icon(0, 1, icon, TE_COL[c & 3u]);            /* icon rows 1..10 = the label's cap height */
     cv_text(l[0] ? LABEL_X : 0, 0, &FONT_S, l, C_GRAY);
@@ -443,6 +454,8 @@ UI_SMALL static uint32_t graph_signature(void)
         return h ^ (ui.frame / 2u);                  /* scope: redraw every other frame */
     h ^= (uint32_t)pg->graph * 131u + TSEL->eng_req + song.sel * 7777u;
 #if CLIPPER_SYNTH
+    if (pg->graph == GR_ARP)                         /* the animal and its moving background */
+        h ^= (ui.frame / 3u) * 2166136261u + t->arp_idx * 40503u + t->arp_note * 257u + t->nheld * 65599u;
     if ((pg->scope == SC_ENGINE || pg->graph == GR_BYTES) && TSEL->eng_req == ENGI_BYTE) {   /* BYTE: the picture scrolls with the note */
         uint32_t bt, bn;
         if (bb_sounding(TSEL, &bt, &bn))
@@ -815,6 +828,109 @@ static void graph_bytes(void)
             cv_rect((int32_t)x * 3, (int32_t)y * 3, 3, 3, bb_color(prog, (q[y][x] - lo) * 255u / sp, q[y][x], x, y, base >> 8));
 }
 
+/* The ARP page: a bytebeat background, and in a black box a see-through animal, the notes as dots inside it. Its pose follows MODE:
+ * flat, climbing, grazing, round-backed with two heads, bristling; it steps with the arp. No note held: the shape of MODE, dim */
+#define AB_C 4
+static void ab_px(int32_t x, int32_t y, uint16_t c) { cv_rect(x, y, 2, 2, c); }
+static void ab_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)
+{
+    int32_t k, dx = x1 - x0, dy = y1 - y0, n = ((dx < 0 ? -dx : dx) > (dy < 0 ? -dy : dy) ? (dx < 0 ? -dx : dx) : (dy < 0 ? -dy : dy)) / 2 + 1;
+    for (k = 0; k <= n; k++)
+        ab_px((x0 + dx * k / n) & ~1, (y0 + dy * k / n) & ~1, c);
+}
+static void ab_head(int32_t x, int32_t y, int32_t f, uint16_t c, uint16_t eye, int sleep)
+{
+    ab_line(x, y, x + f * 22, y, c);
+    ab_line(x, y + 18, x + f * 22, y + 18, c);
+    ab_line(x, y, x, y + 18, c);
+    ab_line(x + f * 22, y, x + f * 22, y + 18, c);
+    ab_line(x + f * 4, y, x + f * 2, y - 10, c);
+    ab_line(x + f * 2, y - 10, x + f * 10, y, c);
+    cv_rect(x + f * 14 - (f < 0 ? 3 : 0), y + 6 + (sleep ? 2 : 0), sleep ? 5 : 4, sleep ? 1 : 4, eye);
+    ab_line(x + f * 18, y + 13, x + f * 22, y + 13, c);
+}
+static void ab_dot(int32_t x, int32_t y, int32_t r, uint16_t c)
+{
+    int32_t j;
+    for (j = -r; j <= r; j++) {
+        int32_t w = r, a = j < 0 ? -j : j;
+        while (w * w + a * a > r * r + 1)
+            w--;
+        cv_rect(x - w, y + j, 2 * w + 1, 1, c);
+    }
+}
+static void graph_arp(void)
+{
+    static const uint8_t GROUP[16] = {0, 1, 2, 3, 4, 0, 0, 3, 1, 3, 3, 0, 0, 4, 0, 4};
+    static const int8_t SW[5][4] = {{2, -2, 2, -2}, {0, 6, -6, 4}, {4, -4, -2, 6}, {0, 3, -3, 0}, {8, -8, 6, -10}};
+    enum { X0 = 82, X1 = 160, Y0 = 36, Y1 = 86, LEG = 116, BX0 = 48, BX1 = 196, BY0 = 1, BY1 = 121 };
+    const track_t *t = TSEL;
+    uint32_t mode = (uint32_t)clamp(t->p[P_AMODE], 0, 15), g = GROUP[mode], x, y, i, n = t->nheld > 8u ? 8u : t->nheld;
+    uint32_t prog = t->eng_req == ENGI_BYTE ? (uint32_t)clamp(t->p[P_E0], 0, (int32_t)BB_N - 1) : mode % BB_N, ph = ui.frame / 3u;
+    int32_t var[10] = {128, 128, 128, 128, 0, 0, 0, 0, 0, 60}, flip = (t->arp_idx & 1u) || (!t->arp_note && (ui.frame / 16u & 1u)) ? -1 : 1, lo = 127, hi = 0;
+    const uint16_t L = RGB(235, 235, 240), col = TE_COL[mode & 3u];
+    int32_t b;
+    var[8] = (int32_t)(ph * 96u);
+    for (y = 0; y < H_GRAPH / AB_C + 1u; y++)            /* the background: a formula of the place and the time, in big pixels */
+        for (x = 0; x < 240u / AB_C; x++) {
+            uint32_t tt = (y * 256u + x * 8u) + ph * 32u, v, px = x * AB_C;
+            if (px + AB_C > BX0 && px < BX1 && y * AB_C + AB_C > BY0 && y * AB_C < BY1)
+                continue;                                /* (behind the box) */
+            v = (uint32_t)bb_eval(prog, (int32_t)tt, var) & 255u;
+            cv_rect((int32_t)px, (int32_t)(y * AB_C), AB_C, AB_C, bb_color(mode, v | 24u, v, x, y, ph));
+        }
+    cv_rect(BX0, BY0, BX1 - BX0, BY1 - BY0, C_BLACK);
+    if (g == 3u) {                                       /* the back */
+        for (b = X0; b < X1; b += 2) {
+            int32_t u = (2 * (b - X0) - (X1 - X0)) * 100 / (X1 - X0);
+            ab_px(b, Y0 + 10 - 26 * (10000 - u * u) / 10000, L);
+            ab_px(b, Y1, L);
+        }
+        ab_line(X0, Y0 + 10, X0, Y1, L);
+        ab_line(X1, Y0 + 10, X1, Y1, L);
+    } else {
+        ab_line(X0 + 8, Y0, X1 - 8, Y0, L), ab_line(X0 + 8, Y1, X1 - 8, Y1, L);
+        ab_line(X0, Y0 + 8, X0, Y1 - 8, L), ab_line(X1, Y0 + 8, X1, Y1 - 8, L);
+        ab_line(X0, Y0 + 8, X0 + 8, Y0, L), ab_line(X1 - 8, Y0, X1, Y0 + 8, L);
+        ab_line(X0, Y1 - 8, X0 + 8, Y1, L), ab_line(X1 - 8, Y1, X1, Y1 - 8, L);
+    }
+    for (i = 0; i < 4u; i++) {                           /* the legs step with the arp */
+        static const uint8_t LX[4] = {92, 106, 136, 150};
+        int32_t sw = SW[g][i] * flip;
+        ab_line(LX[i], Y1, LX[i] + sw, LEG, L);
+        ab_line(LX[i] + sw, LEG, LX[i] + sw + 6, LEG, L);
+    }
+    switch (g) {
+    case 1: ab_line(X1 - 4, Y0 + 4, X1 + 8, Y0 - 6, L); ab_head(X1 + 4, Y0 - 24, 1, L, col, 0); ab_line(X0, Y0 + 6, X0 - 16, Y0 - 14, L); break;
+    case 2: ab_line(X1 - 2, Y1 - 16, X1 + 8, Y1 - 2, L); ab_head(X1 + 6, Y1 + 2, 1, L, col, 0); ab_line(X0, Y0 + 6, X0 - 16, Y0 + 22, L); break;
+    case 3: ab_head(X1 + 4, Y0 + 6, 1, L, col, 0); ab_head(X0 - 4, Y0 + 6, -1, L, col, 0); break;
+    case 4:
+        ab_head(X1 + 4, Y0 - 4, 1, L, col, 0);
+        for (b = X0 + 6; b < X1 - 8; b += 10)
+            ab_line(b, Y0, b + 3, Y0 - 9, col), ab_line(b + 3, Y0 - 9, b + 6, Y0, col);
+        ab_line(X0, Y0 + 8, X0 - 10, Y0 - 6, L), ab_line(X0 - 10, Y0 - 6, X0 - 4, Y0 - 12, L);
+        break;
+    default: ab_head(X1 + 4, Y0 + 2, 1, L, col, mode == 0u); ab_line(X0, Y0 + 6, X0 - 14, Y0 + 2, L); break;
+    }
+    for (i = 0; i < n; i++) {
+        if (t->held[i] < lo) lo = t->held[i];
+        if (t->held[i] > hi) hi = t->held[i];
+    }
+    {
+        static const uint8_t RND[8] = {3, 7, 1, 5, 0, 6, 2, 4};
+        uint32_t m = n ? n : 8u;
+        for (i = 0; i < m; i++) {
+            int32_t dx = X0 + 8 + (int32_t)((i * 2u + 1u) * (uint32_t)(X1 - X0 - 16) / (m * 2u)), dy, top = Y0 + 10, bot = Y1 - 9;
+            int on = n && t->held[i] == t->arp_note && t->arp_note;
+            if (n)
+                dy = hi > lo ? bot - (bot - top) * (t->held[i] - lo) / (hi - lo) : (top + bot) / 2;
+            else
+                dy = g == 1u ? bot - (bot - top) * (int32_t)i / 7 : g == 2u ? top + (bot - top) * (int32_t)i / 7
+                     : g == 3u ? bot - (bot - top) * (int32_t)(i < 4u ? i : 7u - i) / 3 : g == 4u ? top + (bot - top) * RND[i] / 7 : (top + bot) / 2;
+            ab_dot(dx, dy, on ? 6 : 4, on ? C_WHITE : n ? TE_COL[i & 3u] : TE_DIM[i & 3u]);
+        }
+    }
+}
 /* the cat of the intro (splash.c) */
 #define CAT_W 16
 #define CAT_H 12
@@ -1067,6 +1183,10 @@ UI_SMALL static void draw_graph(void)
             cv_oy = 0;
             graph_bytes();
             break;
+        case GR_ARP:
+            cv_oy = 0;
+            graph_arp();
+            break;
 #endif
         default:
 #if CLIPPER_SYNTH
@@ -1083,7 +1203,7 @@ UI_SMALL static void draw_graph(void)
         }
     }
     top = (ui.home && CLIPPER_SYNTH) || (!ui.home && !drum_note && (pg->graph == GR_BROWSE || pg->graph == GR_SLOTS || pg->graph == GR_USER ||
-                                     pg->graph == GR_ROLL || CLIPPER_SYNTH && pg->graph == GR_BYTES || big_page(pg)));   /* these draw from the top */
+                                     pg->graph == GR_ROLL || CLIPPER_SYNTH && (pg->graph == GR_BYTES || pg->graph == GR_ARP) || big_page(pg)));   /* these draw from the top */
     cv_oy = 0;
     if (ui.hot_t && settings.zoom && !(top && (big_page(pg) || pg->graph == GR_ROLL) && !drum_note)) {   /* (the big values show it already) */                 /* focus (menu ZOOM): the touched value, large and white */
         int32_t x;

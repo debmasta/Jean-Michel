@@ -981,6 +981,15 @@ int main(int argc, char **argv)
         for (q = 0; q < 12u; q++) { frame(); if (screen[120 * 240 + 1] != 0) { seen++; if (seen == 1u) ppm("flash_morph"); } }
         check(seen > 0u && seen < 12u, "flash: MORPH strobes");
         TSEL->p[P_E6] = 0; frame(); frame();
+        {   /* the ARP page: background, animal, every MODE draws within the screen; BYTE's skull */
+            uint32_t pi, m; static const char *const NM[4] = {"arp_up", "arp_dn", "arp_updn", "arp_rnd"};
+            ui.force = 1; ui.home = 1; frames(3); ppm("byte_home");
+            for (pi = 0; pi < NPAGES && PAGES[pi].graph != GR_ARP; pi++) ;
+            ui.home = 0; ui.page = (uint8_t)pi; ui.force = 1;
+            for (m = 0; m < 16u; m++) { TSEL->p[P_AMODE] = (int16_t)m; frames(4); if (m >= 1u && m <= 4u) ppm(NM[m - 1u]); }
+            { uint32_t lit = 0, x; TSEL->p[P_AMODE] = 1; frames(4); for (x = 0; x < 240u; x++) lit += screen[100 * 240 + x] != 0; check(lit > 40u, "ARP page: the background"); }
+            TSEL->p[P_AMODE] = 0; ui.home = 1; frames(3);
+        }
         {   /* lightning leaves no trace: on a page, in a layer, in the menu */
             static uint16_t snap[240 * 240];
             uint32_t w, d, x;
