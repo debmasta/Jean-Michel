@@ -159,6 +159,20 @@ int main(void)
         chk("POLY sounds on the two lanes", rhy[0].n == 48u || rhy[1].n == 60u);
         tw_mask = 0; run(40); trk_note_off(&trk[0], 48); run(3000); chk("POLY off, released: nothing left", bounded() && !live());
         tw_midi_cc(28, 127); chk("CC 28 sets the ratio", tw_p[TW_POLY][0] == 11u); tw_midi_cc(28, 30);
+        {   /* FX ON LAYER: the hits on the layer only, the main sound keeps the held note */
+            uint32_t q, g0 = 0, g1 = 0, n1 = 0; int32_t was = 0;
+            quiet(); host_preset(&trk[0], 0u, 0); host_preset(&trk[1], 0u, 3); trk[0].p[P_AMODE] = 0; trk[1].p[P_LYMODE] = LY_LAYER; trk[1].p[P_LYOCT] = 2;
+            tw_p[TW_FOOT][0] = 0; tw_p[TW_FOOT][2] = 2; tw_p[TW_FOOT][3] = 2; tw_mask = 1u << TW_FOOT;
+            trk_note_on(&trk[0], 50, 100);
+            for (q = 0; q < 2000u; q++) { run(1); for (k = 0; k < NVOICE; k++) g0 += trk[0].v[k].gate != 0; if (rhy[0].on && rhy[0].off > was) n1++; was = rhy[0].on ? rhy[0].off : 0; }
+            chk("LAYER: the main sound holds its note all along", g0 >= 2000u);
+            chk("LAYER: the hits come", n1 > 5u && rhy[0].d == 2u);
+            tw_p[TW_FOOT][3] = 1; run(1500); chk("MAIN: now the hits on the main sound", rhy[0].d == 1u);
+            tw_mask = 0; run(40); trk_note_off(&trk[0], 50); run(3000);
+            for (k = 0; k < NVOICE; k++) g1 += trk[1].v[k].active && trk[1].v[k].stage != 4u;
+            chk("LAYER / MAIN: nothing left", !live() && g1 == 0u);
+            tw_p[TW_FOOT][3] = 0; host_preset(&trk[1], TRK_DEF[1][0], TRK_DEF[1][1]); trk[1].p[P_LYMODE] = LY_OFF;
+        }
         chk("RATE x2: twice the clock", rhy_warp(4096, 3) == 8192u && rhy_warp(4096, 1) == 2048u);
         { uint32_t r, x, ok = 1, prev; for (r = 5; r < 8u; r++) for (prev = 0, x = 0; x < 6u * 16384u; x += 64u) { uint32_t w = rhy_warp(x, r); ok &= w >= prev; prev = w; }
           chk("RATE SLOW FAST BOUNC: the clock never goes back", ok); }

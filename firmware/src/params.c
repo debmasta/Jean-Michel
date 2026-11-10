@@ -576,7 +576,7 @@ static const page_t PAGES[] = {
     {"SYSTEM", FAM_GLO, SC_GLOBAL, GR_NONE, {G_MIDI, G_SYNC, G_ROUTE, G_INFO}},
     {"DRUMS", FAM_GLO, SC_GLOBAL, GR_NONE, {G_DRCH, G_DRLVL, G_DRREV, G_DRDLY}},   /* GM kit on MIDI ch 10 */
     {"RHYTHM", FAM_GLO, SC_SYN, GR_NONE, {61, 62, 63, 64}},
-    {"RHYTHM 2", FAM_GLO, SC_SYN, GR_NONE, {72, 73, 0xFF, 0xFF}},   /* X_RFRATE X_RPRATE */   /* X_RFOOT X_RVARY X_RPOLY X_RSPRD (twist.c footwork and poly) */
+    {"RHYTHM 2", FAM_GLO, SC_SYN, GR_NONE, {72, 73, 74, 0xFF}},     /* X_RFRATE X_RPRATE X_RAPPLY */   /* X_RFOOT X_RVARY X_RPOLY X_RSPRD (twist.c footwork and poly) */
 #endif
     {"PRESETS", FAM_SAVE, SC_GLOBAL, GR_BROWSE, {0xFF, 0xFF, 0xFF, 0xFF}},   /* browser: PRESETS knob / KNOB 1 */
     {"USER", FAM_SAVE, SC_GLOBAL, GR_USER, {0xFF, 0xFF, 0xFF, 0xFF}},       /* user presets: SLOT LOAD ERASE SAVE */

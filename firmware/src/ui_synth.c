@@ -30,7 +30,7 @@ enum { X_LYMODE, X_LYSOUND, X_LYSPLIT, X_LYLEVEL, X_LYOCT, X_LYPAN, X_LYFILT, X_
        X_RFOOT, X_RVARY, X_RPOLY, X_RSPRD, /* 61.. */             /* GLO > RHYTHM: footwork off / style, its variation; poly off / ratio, spread */            /* BYTE MEM: MORPH, the memory A..D, capture into it, load it back */
        X_VFLAM, X_VSTACK, X_VGRND, X_VDRIFT,           /* EDIT > VOICE 4 (voice.c), per part */
        X_VACC, X_VOJMP, X_VVRND,                       /* VOICE 5 */
-       X_RFRATE, X_RPRATE,                             /* GLO > RHYTHM 2: footwork, poly rate */
+       X_RFRATE, X_RPRATE, X_RAPPLY,                             /* GLO > RHYTHM 2: footwork, poly rate */
        X_COUNT };
 static void mseq_fill(struct track *t, uint32_t l, uint32_t f);
 static const char *const N_QFILL[] = {"--", "RAMP+", "RAMP-", "TRI", "SINE", "SQR", "RND", "FLAT", "INVRT", "SHIFT"};
@@ -120,6 +120,7 @@ static const param_desc_t XD[X_COUNT] = {
     [X_RFOOT] = PE("FOOT", N_RFOOT, 0),
     [X_RFRATE] = PE("F RATE", TN_RATE, 2),
     [X_RPRATE] = PE("P RATE", TN_RATE, 2),
+    [X_RAPPLY] = PE("FX ON", TN_DST, 0),
     [X_RVARY] = PE("VARY", TN_FVR, 2),
     [X_RPOLY] = PE("POLY", N_RPOLY, 0),
     [X_RSPRD] = PE("SPREAD", TN_PSP, 1),
@@ -639,6 +640,7 @@ UI_SMALL static const param_desc_t *syn_desc(uint32_t id, int16_t **valp)
     case X_RFOOT: tw_init(); xv[X_RFOOT] = ((tw_mask >> TW_FOOT) & 1u) ? (int16_t)(tw_p[TW_FOOT][0] + 1) : 0; *valp = &xv[X_RFOOT]; break;
     case X_RFRATE: tw_init(); xv[X_RFRATE] = tw_p[TW_FOOT][2]; *valp = &xv[X_RFRATE]; break;
     case X_RPRATE: tw_init(); xv[X_RPRATE] = tw_p[TW_POLY][2]; *valp = &xv[X_RPRATE]; break;
+    case X_RAPPLY: tw_init(); xv[X_RAPPLY] = tw_p[TW_FOOT][3]; *valp = &xv[X_RAPPLY]; break;
     case X_RVARY: tw_init(); xv[X_RVARY] = tw_p[TW_FOOT][1]; *valp = &xv[X_RVARY]; break;
     case X_RPOLY: tw_init(); xv[X_RPOLY] = ((tw_mask >> TW_POLY) & 1u) ? (int16_t)(tw_p[TW_POLY][0] + 1) : 0; *valp = &xv[X_RPOLY]; break;
     case X_RSPRD: tw_init(); xv[X_RSPRD] = tw_p[TW_POLY][1]; *valp = &xv[X_RSPRD]; break;
@@ -772,6 +774,7 @@ UI_SMALL static void syn_changed(uint32_t id, int16_t *vp)
     case X_RVARY: tw_p[TW_FOOT][1] = (uint8_t)*vp; break;
     case X_RFRATE: tw_p[TW_FOOT][2] = (uint8_t)*vp; break;
     case X_RPRATE: tw_p[TW_POLY][2] = (uint8_t)*vp; break;
+    case X_RAPPLY: tw_p[TW_FOOT][3] = (uint8_t)*vp; break;
     case X_RSPRD: tw_p[TW_POLY][1] = (uint8_t)*vp; break;
     case X_BMORPH:
         ui.lock_par = P_E6;                             /* (hold a step in SEQ: this is what it locks) */

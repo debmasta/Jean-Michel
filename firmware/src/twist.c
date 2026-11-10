@@ -46,6 +46,7 @@ static const char *const TN_NUA[] = {"HAIR", "SOFT", "MID"};
 static const char *const TN_NUM[] = {"FIXED", "EVOLVE", "RND"};
 static const char *const TN_FST[] = {"JUKE", "GHETTO", "ROLLS", "CHOP", "DRILL", "HALF", "SKIP", "STAGR"};
 /* RATE: footwork and poly slower, faster, or a bar that slows down / speeds up (BOUNC: one then the other) */
+static const char *const TN_DST[] = {"BOTH", "MAIN", "LAYER"};   /* footwork and poly: on the sound and its layer, or one of them */
 static const char *const TN_RATE[] = {"1/4", "1/2", "x1", "x2", "x3", "SLOW", "FAST", "BOUNC"};
 static const char *const TN_FVR[] = {"0", "25", "50", "75", "100"};
 static const char *const TN_PRT[] = {"3:2", "3:4", "5:4", "7:4", "5:3", "7:5", "2:1", "4:3", "5:2", "9:4", "11:8", "13:8"};
@@ -71,7 +72,7 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_BLFO] = {{"form", 16, 0, TN_LAB}, {"dest", NN(TN_DEST), 0, TN_DEST}, {"depth", NN(TN_DEPTH), 2, TN_DEPTH}, {"speed", NN(TN_LRATE), 2, TN_LRATE}},
     [TW_TARP] = {{"set", NN(TN_TSET), 0, TN_TSET}, {"rate", NN(TN_ARATE), 2, TN_ARATE}},
     [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
-    [TW_FOOT] = {{"style", NN(TN_FST), 0, TN_FST}, {"vary", NN(TN_FVR), 2, TN_FVR}, {"rate", NN(TN_RATE), 2, TN_RATE}},
+    [TW_FOOT] = {{"style", NN(TN_FST), 0, TN_FST}, {"vary", NN(TN_FVR), 2, TN_FVR}, {"rate", NN(TN_RATE), 2, TN_RATE}, {"on", NN(TN_DST), 0, TN_DST}},
     [TW_POLY] = {{"ratio", NN(TN_PRT), 1, TN_PRT}, {"spread", NN(TN_PSP), 1, TN_PSP}, {"rate", NN(TN_RATE), 2, TN_RATE}},
     [TW_REMIX] = {{"every", NN(TN_REV), 1, TN_REV}, {"wild", NN(TN_RWI), 1, TN_RWI}},
     [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
@@ -331,25 +332,42 @@ static void tw_triple(uint32_t adv)
 }
 /* FOOTWORK and POLY: the note held (playing: the last note of the sequencer too) cut up by a rhythm generator, on the clock.
  * FOOTWORK: a bar of 16 cells (rest, hit, roll of 2 3 4) that varies by itself; POLY: two lanes, A against B hits per two beats */
-static struct { uint8_t on, n; int32_t off; } rhy[2];
-static uint8_t rhy_mute;
-static uint32_t rhy_free, rhy_ftick = 0xFFFFFFFFu, rhy_bar, rhy_pi[2] = {0xFFFFFFFFu, 0xFFFFFFFFu};
-static void rhy_choke(void)                      /* every hit cuts what was let go and still rings (~1.5 ms fade): no tail piles up */
+static struct { uint8_t on, n, d; int32_t off; } rhy[2];
+static uint8_t rhy_mute;                         /* 0, else 1 + where the held note was let go */
+static uint32_t rhy_dst(void) { return layer_mode() == LY_OFF ? 0u : tw_v(TW_FOOT, 3); }
+static uint32_t rhy_ly(uint32_t n) { return (uint32_t)clamp((int32_t)n + (trk[1].p[P_LYOCT] - 2) * 12, 0, 127); }
+static void rhy_on(uint32_t d, uint32_t n, uint32_t vel)
 {
-    uint32_t k;
-    for (k = 0; k < NVOICE; k++) {
-        voice_t *v = &trk[0].v[k];
-        if (v->active && !v->gate && v->stage != 4u)
-            voice_kill(v);
-    }
+    if (!d) trk_note_on0(&trk[0], n, vel);
+    else if (d == 1u) trk_note_on1(&trk[0], n, vel);
+    else trk_note_on1(&trk[1], rhy_ly(n), vel);
+}
+static void rhy_off(uint32_t d, uint32_t n)
+{
+    if (!d) trk_note_off0(&trk[0], n);
+    else if (d == 1u) trk_note_off1(&trk[0], n);
+    else trk_note_off1(&trk[1], ly_route[n] & 2u ? ly_note[n] : rhy_ly(n));
+}
+static uint32_t rhy_free, rhy_ftick = 0xFFFFFFFFu, rhy_bar, rhy_pi[2] = {0xFFFFFFFFu, 0xFFFFFFFFu};
+static void rhy_choke(uint32_t d)                /* every hit cuts what was let go and still rings (~1.5 ms fade): no tail piles up */
+{
+    uint32_t k, p;
+    for (p = 0; p < 2u; p++)
+        if (d == 0u || d == p + 1u)
+            for (k = 0; k < NVOICE; k++) {
+                voice_t *v = &trk[p].v[k];
+                if (v->active && !v->gate && v->stage != 4u)
+                    voice_kill(v);
+            }
 }
 static void rhy_hit(uint32_t l, uint32_t note, uint32_t vel, int32_t gate)
 {
+    uint32_t d = rhy_mute ? rhy_mute - 1u : rhy_dst();
     if (rhy[l].on)
-        trk_note_off0(&trk[0], rhy[l].n);
-    rhy_choke();
-    trk_note_on0(&trk[0], note, vel);
-    rhy[l].on = 1, rhy[l].n = (uint8_t)note, rhy[l].off = gate;
+        rhy_off(rhy[l].d, rhy[l].n);
+    rhy_choke(d);
+    rhy_on(d, note, vel);
+    rhy[l].on = 1, rhy[l].n = (uint8_t)note, rhy[l].d = (uint8_t)d, rhy[l].off = gate;
 }
 /* the clock of a RATE: x (4096 a beat) scaled, or bent within each bar (a slowing bar: the hits dense first, wide at its end) */
 static uint32_t rhy_warp(uint32_t x, uint32_t r)
@@ -380,7 +398,7 @@ static void rhy_block(uint32_t adv)
     uint32_t i, note = 0, vel = 100, have = 0, u;
     for (i = 0; i < 2u; i++)
         if (rhy[i].on && (rhy[i].off -= (int32_t)adv) <= 0) {
-            trk_note_off0(&trk[0], rhy[i].n);
+            rhy_off(rhy[i].d, rhy[i].n);
             rhy[i].on = 0;
         }
     for (i = 0; i < TW_NH && !tw_h[i].on; i++)
@@ -389,21 +407,35 @@ static void rhy_block(uint32_t adv)
         note = tw_h[i].out, vel = tw_h[i].vel, have = 1;
     else if (song.playing && tw_last_on)
         note = tw_last_n, vel = tw_last_v, have = 1;
+    if (rhy_mute && rhy_mute - 1u != rhy_dst()) {      /* (where it plays changed: back to the held note, then again) */
+        for (i = 0; i < 2u; i++)
+            if (rhy[i].on)
+                rhy_off(rhy[i].d, rhy[i].n), rhy[i].on = 0;
+        for (i = 0; i < TW_NH && !tw_h[i].on; i++)
+            ;
+        if (i < TW_NH)
+            tw_h[i].cur = tw_h[i].out, rhy_on(rhy_mute - 1u, tw_h[i].out, tw_h[i].vel);
+        rhy_mute = 0;
+    }
     if ((!tw_is(TW_FOOT) && !tw_is(TW_POLY)) || !have) {
         if (rhy_mute) {
+            uint32_t d = rhy_mute - 1u, l;
             rhy_mute = 0;
+            for (l = 0; l < 2u; l++)                 /* (a hit still on: let go first, or its end would cut the note given back) */
+                if (rhy[l].on)
+                    rhy_off(rhy[l].d, rhy[l].n), rhy[l].on = 0;
             if (i < TW_NH) {                         /* back to the note you hold */
                 tw_h[i].cur = tw_h[i].out;
-                trk_note_on0(&trk[0], tw_h[i].out, tw_h[i].vel);
+                rhy_on(d, tw_h[i].out, tw_h[i].vel);
             }
         }
         rhy_pi[0] = rhy_pi[1] = rhy_ftick = 0xFFFFFFFFu;
         return;
     }
     if (!rhy_mute) {
-        rhy_mute = 1;
+        rhy_mute = (uint8_t)(1u + rhy_dst());
         if (i < TW_NH)
-            trk_note_off0(&trk[0], tw_h[i].cur);     /* the held note makes room: the rhythm plays it */
+            rhy_off(rhy_mute - 1u, tw_h[i].cur);    /* the held note makes room (there only): the rhythm plays it */
     }
     if (song.playing)
         u = (uint32_t)(bb_Tnow >> 8);                /* T << 8 (Q28 beats >> 16 = T, 4096 a beat) */
@@ -700,6 +732,11 @@ static void tw_apply(void)
 /* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
 static int tw_midi_cc(uint32_t cc, uint32_t v)
 {
+    if (cc == 61u) {                              /* footwork and poly: BOTH, MAIN, LAYER */
+        tw_init();
+        tw_p[TW_FOOT][3] = (uint8_t)(v * 3u / 128u);
+        return 1;
+    }
     if (cc == 59u || cc == 60u) {                 /* FOOTWORK rate, POLY rate */
         uint32_t k = cc == 59u ? TW_FOOT : TW_POLY;
         tw_init();
