@@ -870,6 +870,15 @@ int main(int argc, char **argv)
         for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].title, "LAYER FX"); pi++) ;
         check(pi < NPAGES, "LAYER FX page");
         if (pi < NPAGES) { syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_REV], "LAYER FX: REV is the layer's reverb send"); }
+        for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].title, "LAYER INS"); pi++) ;
+        check(pi < NPAGES, "LAYER INS page");
+        if (pi < NPAGES) {
+            const param_desc_t *d;
+            trk[1].p[P_ITYPE] = 12;
+            syn_desc(PAGES[pi].id[0], &vp); check(vp == &trk[1].p[P_ITYPE], "LAYER INS: TYPE is the layer's");
+            d = syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_IC] && !strcmp(d->label, "ROAR"), "LAYER INS: C named by the layer's type (ROAR)");
+            trk[1].p[P_ITYPE] = 0;
+        }
     }
     printf("clipper_ui: %s\n", fails ? "FAILED" : "all passed");
     return fails != 0;

@@ -783,7 +783,7 @@ static void tflt_run(djf_t *f, const tsvf_t *c, int32_t *b, uint32_t n, uint32_t
  * fades the new one in; so does a start from MIX 0 (no stale line or filter).
  * State in RAM (.bss): 580 B a sound; noinline, its own loops */
 enum { IT_OFF, IT_SOFT, IT_HARD, IT_FOLD, IT_FUZZ, IT_CRUSH, IT_PHASER, IT_FLANGER, IT_CHORUS,
-       IT_JUNO1, IT_JUNO2, IT_JUNO12, IT_N };   /* (0.8: the JUNO chorus, juno_chorus below: the INSERT passes them) */
+       IT_JUNO1, IT_JUNO2, IT_JUNO12, IT_ROAR, IT_N };   /* (0.8: the JUNO chorus, juno_chorus below: the INSERT passes them) */
 _Static_assert(IT_N == sizeof N_ITYPE / sizeof N_ITYPE[0], "the INSERT's types as params.c names them");
 _Static_assert(P_IA == P_ITYPE + 1 && P_IC == P_ITYPE + 3 && P_IMIX == P_ITYPE + 4, "the INSERT's values in order");
 #define IL_LEN 256u                     /* FLANG / CHOR: the line, samples (a power of 2: masked) */
@@ -962,11 +962,47 @@ static __attribute__((noinline)) void ins_swept(ins_t *s, const int16_t *p, int3
     s->dc = dc;
 }
 
+/* ROAR (Jean-Michel, after the idea of Live 12's Roar): DRIVE into a shaper whose SHAPE goes soft -> folded -> hard, its output
+ * back into it through a short line a slow LFO sweeps (0.4 .. 6 ms): ROAR feeds back, a flanger that screams. Tone-tamed, DC-blocked */
+static __attribute__((noinline)) void ins_roar(ins_t *s, const int16_t *p, int32_t *b, uint32_t n, int32_t tw)
+{
+    uint32_t i, inc = LFO_INC[34] / CTL, ph = s->ph, wp = s->wp, m = (uint32_t)clamp(p[P_IB], 0, 127);
+    int32_t a = clamp(p[P_IA], 0, 127), g = 4096 + a * a * 3, fbk = clamp(p[P_IC], 0, 127) * 230;   /* 0 .. 0.9, Q15 */
+    int32_t w = s->w, hp = s->hp, dc = s->dc, lp = s->lp1, k = ins_lpk(104), fb = s->fb;
+    uint32_t mw = m < 64u ? m * 512u : (m - 64u) * 520u;                  /* (Q15 within its half) */
+    int16_t *line = s->line;
+    for (i = 0; i < n; i++, ph += inc) {
+        int32_t x = b[i], v, y, s0, s1, fr, r0, r1;
+        uint32_t d = (26u << 16) + (ins_tri(ph) >> 1) * 4u * 70u;        /* Q16 samples */
+        if (s->fill)
+            s->fill--;
+        if (!s->fill)
+            w += clamp(tw - w, -SL_SLOPE, SL_SLOPE);
+        hp += ((x << 8) - hp) >> 8;
+        v = clamp(x - (hp >> 8) + mulq15(fb, fbk), -230000, 230000);
+        v = ((v >> 3) * g) >> 9;
+        s0 = m < 64u ? softclip(v) : ins_shape(IT_FOLD, v, 0);
+        s1 = m < 64u ? ins_shape(IT_FOLD, v, 0) : clamp(v, -22000, 22000);
+        y = s0 + (int32_t)(((int64_t)(s1 - s0) * (int32_t)mw) >> 15);
+        lp += mulq16(y - lp, (uint32_t)k);                                  /* (the fold's top tamed) */
+        y = lp;
+        line[wp] = (int16_t)clamp(y >> 2, -32767, 32767);
+        r0 = (int32_t)(wp - (d >> 16)) & (int32_t)(IL_LEN - 1u);
+        r1 = (r0 - 1) & (int32_t)(IL_LEN - 1u);
+        fr = (int32_t)((d >> 1) & 0x7FFFu);
+        fb = (line[r0] + (((line[r1] - line[r0]) * fr) >> 15)) << 2;
+        wp = (wp + 1u) & (IL_LEN - 1u);
+        y = (y + fb) >> 1;
+        dc += ((y << 8) - dc) >> 9;
+        b[i] = ins_mix(x, y - (dc >> 8), w);
+    }
+    s->ph = ph, s->wp = (uint16_t)wp, s->w = w, s->hp = hp, s->dc = dc, s->lp1 = lp, s->fb = fb;
+}
 /* the INSERT of the settings p on one channel b through state s: 1 while it runs (or fades out); 0: dry, bit for bit */
 static __attribute__((noinline)) int ins_run(ins_t *s, const int16_t *p, int32_t *b, uint32_t n, int fresh)
 {
     int32_t ty = clamp(p[P_ITYPE], 0, IT_N - 1), tw;
-    if (ty >= IT_JUNO1)
+    if (ty >= IT_JUNO1 && ty <= IT_JUNO12)
         ty = IT_OFF;                                    /* the JUNO chorus: not here (juno_chorus, after the FILTER) */
     if (s->type != ty && !s->w)                         /* faded out: the new type from rest */
         s->type = (uint8_t)ty, s->fill = 0;
@@ -976,10 +1012,12 @@ static __attribute__((noinline)) int ins_run(ins_t *s, const int16_t *p, int32_t
             return 0;                                   /* dry: bit for bit */
         memset(s, 0, sizeof *s);                        /* starting: no stale line or filter */
         s->type = (uint8_t)ty;
-        if ((ty == IT_FLANGER || ty == IT_CHORUS) && !fresh)
+        if ((ty == IT_FLANGER || ty == IT_CHORUS || ty == IT_ROAR) && !fresh)
             s->fill = IL_LEN;                           /* (the part was silent: the empty line is its past, no wait) */
     }
-    if (s->type >= IT_PHASER)
+    if (s->type == IT_ROAR)
+        ins_roar(s, p, b, n, tw);
+    else if (s->type >= IT_PHASER)
         ins_swept(s, p, b, n, tw);
     else
         ins_drive(s, p, b, n, tw);

@@ -32,6 +32,7 @@ enum { X_LYMODE, X_LYSOUND, X_LYSPLIT, X_LYLEVEL, X_LYOCT, X_LYPAN, X_LYFILT, X_
        X_VACC, X_VOJMP, X_VVRND,                       /* VOICE 5 */
        X_RFRATE, X_RPRATE, X_RAPPLY,                             /* GLO > RHYTHM 2: footwork, poly rate */
        X_LYDST, X_LYCHO, X_LYDLY, X_LYREV,            /* EDIT > LAYER FX: the layer's own sends */
+       X_LYITYPE, X_LYIA, X_LYIB, X_LYIC, X_LYIMIX,    /* EDIT > LAYER INS, LAYER INS 2: the layer's INSERT */
        X_COUNT };
 static void mseq_fill(struct track *t, uint32_t l, uint32_t f);
 static const char *const N_QFILL[] = {"--", "RAMP+", "RAMP-", "TRI", "SINE", "SQR", "RND", "FLAT", "INVRT", "SHIFT"};
@@ -72,6 +73,11 @@ static const param_desc_t XD[X_COUNT] = {
     [X_LYCHO] = PD("CHO", F_PCT, 0, 127, 0),
     [X_LYDLY] = PD("DLY", F_PCT, 0, 127, 0),
     [X_LYREV] = PD("REV", F_PCT, 0, 127, 0),
+    [X_LYITYPE] = PE("TYPE", N_ITYPE, 0),
+    [X_LYIA] = PD("INS A", F_PCT, 0, 127, 64),
+    [X_LYIB] = PD("INS B", F_PCT, 0, 127, 96),
+    [X_LYIC] = PD("INS C", F_PCT, 0, 127, 96),
+    [X_LYIMIX] = PD("MIX", F_PCT, 0, 127, 127),
     [X_LYSWAP] = PE("SWAP", N_GO, 0),
     [X_MORPH] = PD("MORPH", F_PCT, 0, 127, 0),
     [X_SETA] = PE("SET A", N_GO, 0),
@@ -670,6 +676,13 @@ UI_SMALL static const param_desc_t *syn_desc(uint32_t id, int16_t **valp)
     case X_LYCHO: *valp = &l->p[P_CHOR]; break;
     case X_LYDLY: *valp = &l->p[P_DLY]; break;
     case X_LYREV: *valp = &l->p[P_REV]; break;
+    case X_LYITYPE: *valp = &l->p[P_ITYPE]; break;
+    case X_LYIMIX: *valp = &l->p[P_IMIX]; break;
+    case X_LYIA:
+    case X_LYIB:
+    case X_LYIC:                                      /* named as the layer's TYPE names them */
+        *valp = &l->p[P_IA + (id - X_LYIA)];
+        return ins_desc(l->p[P_ITYPE], id - X_LYIA);
     case X_MSRC:
     case X_MDST:
     case X_MAMT: {                                    /* the slot's own values, the selected sound's */

@@ -40,7 +40,7 @@ static const char *const N_MODDST[] = {"OFF", "VIB", "CUT", "SHP", "WAH", "TREM"
 /* Clipper 0.6: the INSERT's types (fx.c IT_*; SLOOP 2.6's, same order: a SLOOP 2.6 sound keeps its INSERT). Its three
  * values A B C mean what the type says (ins_desc) */
 static const char *const N_ITYPE[] = {"OFF", "SOFT", "HARD", "FOLD", "FUZZ", "CRUSH", "PHASR", "FLANG", "CHOR",
-                                     "JUNO1", "JUNO2", "JUN12"};   /* (0.8: the JUNO chorus, I II I+II, on any sound) */
+                                     "JUNO1", "JUNO2", "JUN12", "ROAR"};   /* (Jean-Michel: ROAR, fx.c ins_roar) */   /* (0.8: the JUNO chorus, I II I+II, on any sound) */
 /* CRUSH: BITS 1..16 and RATE (the held sample's rate) over the range in 16 even parts (0-terminated) */
 static const char *const N_IBITS[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
                                       "16", 0};
@@ -276,18 +276,19 @@ static const param_desc_t DRUM_KIT_DESC = PE("KIT", DRUM_KIT_NAMES, 0);
 /* the INSERT's A B C as its TYPE means them (TP's ranges and defaults): the drives DRIVE TONE LEVEL, CRUSH BITS RATE
  * LPF, the swept ones RATE DEPTH FDBK; OFF TP's own (as SLOOP 2.6) */
 #define PU(l, f, df, n, u) {l, f, 0, 127, df, n, u}
-static const param_desc_t INS_DESC[4][3] = {
+static const param_desc_t INS_DESC[5][3] = {
     {PU("DRIVE", F_PCT, 64, 0, 0), PU("TONE", F_CUTOFF, 96, 0, 0), PU("LEVEL", F_DB, 96, 0, 0)},
     {PU("BITS", F_INT, 64, N_IBITS, 0), PU("RATE", F_INT, 96, N_IRATE, "Hz"), PU("LPF", F_CUTOFF, 96, 0, 0)},
     {PU("RATE", F_LFOHZ, 64, 0, 0), PU("DEPTH", F_PCT, 96, 0, 0), PU("FDBK", F_PCT, 96, 0, 0)},
     {PU("WIDTH", F_PCT, 127, 0, 0), PU("TONE", F_CUTOFF, 100, 0, 0), PU("NOISE", F_PCT, 0, 0, 0)},   /* JUNO1 .. JUN12 */
+    {PU("DRIVE", F_PCT, 70, 0, 0), PU("SHAPE", F_PCT, 64, 0, 0), PU("ROAR", F_PCT, 50, 0, 0)},   /* ROAR */
 };
 #undef PU
 static const param_desc_t *ins_desc(int32_t type, uint32_t k)
 {
     if (type <= 0 || type >= (int32_t)(sizeof N_ITYPE / sizeof N_ITYPE[0]))
         return &TP[P_IA + k];
-    return &INS_DESC[type < 5 ? 0 : type == 5 ? 1 : type < 9 ? 2 : 3][k % 3u];   /* (SOFT .. FUZZ, CRUSH, the swept
+    return &INS_DESC[type < 5 ? 0 : type == 5 ? 1 : type < 9 ? 2 : type < 12 ? 3 : 4][k % 3u];   /* (SOFT .. FUZZ, CRUSH, the swept
                                                                                 * ones, the JUNO chorus) */
 }
 #endif
@@ -559,6 +560,8 @@ static const page_t PAGES[] = {
     {"LAYER", FAM_EDIT, SC_SYN, GR_LAYER, {0, 1, 2, 3}},         /* X_LYMODE X_LYSOUND X_LYSPLIT X_LYLEVEL */
     {"LAYER 2", FAM_EDIT, SC_SYN, GR_LAYER, {4, 5, 6, 7}},       /* X_LYOCT X_LYPAN X_LYFILT X_LYSWAP */
     {"LAYER FX", FAM_EDIT, SC_SYN, GR_LAYER, {75, 76, 77, 78}},   /* X_LYDST X_LYCHO X_LYDLY X_LYREV: the layer's sends */
+    {"LAYER INS", FAM_EDIT, SC_SYN, GR_LAYER, {79, 80, 81, 82}},  /* X_LYITYPE X_LYIA X_LYIB X_LYIC */
+    {"LAYER INS 2", FAM_EDIT, SC_SYN, GR_LAYER, {83, 0xFF, 0xFF, 0xFF}},   /* X_LYIMIX */
     {"MORPH", FAM_EDIT, SC_SYN, GR_MORPH, {8, 9, 10, 0xFF}},     /* X_MORPH X_SETA X_SETB */
     {"RANDOM", FAM_EDIT, SC_SYN, GR_NONE, {11, 12, 13, 14}},     /* X_RNDAMT X_RNDWHAT X_RNDGO X_RNDBACK */
     {"UNDO", FAM_EDIT, SC_SYN, GR_HIST, {41, 42, 0xFF, 0xFF}},   /* (0.7) X_HPOS X_HCMP: the sound's history, COMPARE */
