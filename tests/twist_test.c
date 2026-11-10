@@ -148,6 +148,9 @@ int main(void)
         for (q = 0; q < 2000u; q++) { run(4); if (rhy[0].on && rhy[0].off > was) hits++; was = rhy[0].on ? rhy[0].off : 0; }
         printf("  footwork: %u hits\n", hits);
         chk("FOOTWORK plays hits on the held note", hits > 5u);
+        { uint32_t mx = 0, q2, g; trk[0].p[P_REL] = 120; trk[0].p[P_VOICE] = 0; tw_p[TW_FOOT][0] = 2;
+          for (q2 = 0; q2 < 3000u; q2++) { run(1); for (g = 0, k = 0; k < NVOICE; k++) g += trk[0].v[k].active && trk[0].v[k].stage != 4u; if (g > mx) mx = g; }
+          printf("  footwork long release: %u voices at most\n", mx); chk("FOOTWORK: the hits cut each other, no pile-up", mx <= 2u); }
         tw_mask = 0; run(40);
         { uint32_t g = 0; for (k = 0; k < NVOICE; k++) g += trk[0].v[k].gate != 0; chk("off: the held note comes back", g >= 1u); }
         trk_note_off(&trk[0], 48); run(3000); chk("released: nothing left", !live());

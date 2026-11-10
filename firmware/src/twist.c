@@ -331,10 +331,20 @@ static void tw_triple(uint32_t adv)
 static struct { uint8_t on, n; int32_t off; } rhy[2];
 static uint8_t rhy_mute;
 static uint32_t rhy_free, rhy_ftick = 0xFFFFFFFFu, rhy_bar, rhy_pi[2] = {0xFFFFFFFFu, 0xFFFFFFFFu};
+static void rhy_choke(void)                      /* every hit cuts what was let go and still rings (~1.5 ms fade): no tail piles up */
+{
+    uint32_t k;
+    for (k = 0; k < NVOICE; k++) {
+        voice_t *v = &trk[0].v[k];
+        if (v->active && !v->gate && v->stage != 4u)
+            voice_kill(v);
+    }
+}
 static void rhy_hit(uint32_t l, uint32_t note, uint32_t vel, int32_t gate)
 {
     if (rhy[l].on)
         trk_note_off0(&trk[0], rhy[l].n);
+    rhy_choke();
     trk_note_on0(&trk[0], note, vel);
     rhy[l].on = 1, rhy[l].n = (uint8_t)note, rhy[l].off = gate;
 }
