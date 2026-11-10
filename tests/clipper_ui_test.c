@@ -865,6 +865,12 @@ int main(int argc, char **argv)
         t->p[P_AMODE] = 0; frames(2);
         set_engine_of(t, eb); apply_preset_to(t, 0); frames(2);
     }
+    {   /* EDIT > LAYER FX: its knobs are the layer's sends */
+        uint32_t pi; int16_t *vp = 0;
+        for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].name, "LAYER FX"); pi++) ;
+        check(pi < NPAGES, "LAYER FX page");
+        if (pi < NPAGES) { syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_REV], "LAYER FX: REV is the layer's reverb send"); }
+    }
     printf("clipper_ui: %s\n", fails ? "FAILED" : "all passed");
     return fails != 0;
 }
