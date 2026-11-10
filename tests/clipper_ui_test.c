@@ -867,7 +867,7 @@ int main(int argc, char **argv)
     }
     {   /* EDIT > LAYER FX: its knobs are the layer's sends */
         uint32_t pi; int16_t *vp = 0;
-        for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].name, "LAYER FX"); pi++) ;
+        for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].title, "LAYER FX"); pi++) ;
         check(pi < NPAGES, "LAYER FX page");
         if (pi < NPAGES) { syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_REV], "LAYER FX: REV is the layer's reverb send"); }
     }
