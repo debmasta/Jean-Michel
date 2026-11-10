@@ -68,10 +68,13 @@ static void wt_user_scan(uint32_t k)
         wt_building = -1;
     }
 }
-static const int16_t (*wt_spec(uint32_t table, uint32_t f))[2]
+static const int16_t (*wt_spec(uint32_t table, uint32_t f, uint32_t *nh))[2]
 {
-    if (table < WT_NFACTORY)
+    *nh = WT_NH;
+    if (table < WT_NFACTORY) {
+        *nh = WT_FNH;                                   /* (the factory tables keep their first 64) */
         return WT_SPEC[table][f];
+    }
     {
         const wt_user_t *u = wt_user(table - WT_NFACTORY);
         return u ? u->spec[f] : 0;
@@ -154,10 +157,10 @@ static void wt_ifft(uint32_t N)
 }
 static void wt_build_frame(uint32_t table, uint32_t f)
 {
-    const int16_t (*sp)[2] = wt_spec(table, f);
-    uint32_t l;
+    uint32_t l, nh;
+    const int16_t (*sp)[2] = wt_spec(table, f, &nh);
     for (l = 0; l < WT_LEVELS; l++) {
-        uint32_t n, h, N = 1024u >> l, H = 128u >> l, h0 = (H * 3u) / 5u;
+        uint32_t n, h, N = 1024u >> l, H = 128u >> l, h0 = (H * 3u) / 5u, hn = H < nh ? H : nh;
         int16_t *d = &wt_mip[f][WT_OFF[l]];
         if (!sp) {
             for (n = 0; n < N; n++)
@@ -166,7 +169,7 @@ static void wt_build_frame(uint32_t table, uint32_t f)
         }
         for (n = 0; n < N; n++)
             wt_fr[n] = wt_fi[n] = 0;
-        for (h = 0; h < H; h++) {
+        for (h = 0; h < hn; h++) {
             /* the taper: 1 up to 0.6 H, then a raised cosine to 0 at H: the top partials (whose images the cubic
              * cannot hide) fade, and a copy's switch to the next octave's is smooth */
             int32_t tap = h + 1u <= h0 ? 32767 : (32767 + SINE[(256u + (h + 1u - h0) * 512u / (H + 1u - h0)) & 1023u]) >> 1;
