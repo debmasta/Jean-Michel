@@ -337,10 +337,11 @@ static void tw_cc_out(void)
     static uint32_t sent;
     uint32_t i, ch = (tw_mask ^ sent) | tw_cc_force;
     tw_cc_force = 0;
-    for (i = 0; i <= TW_POLY; i++)
+    for (i = 0; i < TW_N; i++)
         if (((ch >> i) & 1u) && i != TW_ALLOFF && i != TW_CATS && i != TW_SETA && i != TW_SETB && i != TW_RECCLR) {
-            uint32_t cc = i < 14u ? 102u + i : i == TW_BLFO ? 118u : i == TW_TARP ? 85u : i == TW_NUA ? 84u : i == TW_FOOT ? 30u : i == TW_POLY ? 31u : 86u, q = ((tw_mask >> i) & 1u) ? 127u : 0u;
-            midi_out_event(0x0Bu | (0xB0u | trk_midi_ch(0)) << 8 | cc << 16 | q << 24);
+            uint32_t cc = i < 14u ? 102u + i : i == TW_BLFO ? 118u : i == TW_TARP ? 85u : i == TW_NUA ? 84u : i == TW_FOOT ? 30u : i == TW_POLY ? 31u : i == TW_BREAK ? 62u : i >= TW_CHAOS ? 0u : 86u, q = ((tw_mask >> i) & 1u) ? 127u : 0u;
+            if (cc)                                  /* (CHAOS REMIX GRAB: not echoed) */
+                    midi_out_event(0x0Bu | (0xB0u | trk_midi_ch(0)) << 8 | cc << 16 | q << 24);
         }
     sent = tw_mask;
 }

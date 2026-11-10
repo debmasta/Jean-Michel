@@ -173,6 +173,26 @@ int main(void)
             chk("LAYER / MAIN: nothing left", !live() && g1 == 0u);
             tw_p[TW_FOOT][3] = 0; host_preset(&trk[1], TRK_DEF[1][0], TRK_DEF[1][1]); trk[1].p[P_LYMODE] = LY_OFF;
         }
+        {   /* BREAK: cuts and hits, then nothing left; ARP and TRIPLE ARP on the layer only: the main sound keeps its note */
+            uint32_t q, hits = 0, cuts = 0, g0, held; int32_t was = 0;
+            quiet(); host_preset(&trk[0], 0u, 0); trk[0].p[P_AMODE] = 0; tw_p[TW_BREAK][1] = 2; tw_p[TW_BREAK][0] = 0; tw_mask = 1u << TW_BREAK;
+            trk_note_on(&trk[0], 48, 100);
+            for (q = 0; q < 6000u; q++) { uint8_t on0 = rhy[0].on; run(1); if (rhy[0].on && rhy[0].off > was) hits++; if (on0 && !rhy[0].on) cuts++; was = rhy[0].on ? rhy[0].off : 0; }
+            printf("  break: %u hits, %u cuts\n", hits, cuts);
+            chk("BREAK hits and cuts", hits > 8u && cuts > 2u);
+            tw_mask = 0; run(40); trk_note_off(&trk[0], 48); run(3000); chk("BREAK: nothing left", !live());
+            quiet(); host_preset(&trk[0], 0u, 0); host_preset(&trk[1], 0u, 3); trk[0].p[P_AMODE] = 0; trk[1].p[P_LYMODE] = LY_LAYER; trk[1].p[P_LYOCT] = 2;
+            tw_p[TW_FOOT][3] = 2;
+            for (int w = 0; w < 2; w++) {
+                tw_mask = w ? 1u << TW_TARP : (1u << TW_ARP | 1u << TW_STUT);
+                trk_note_on(&trk[0], 50, 100);
+                for (held = 0, q = 0; q < 2000u; q++) { run(1); for (g0 = 0, k = 0; k < NVOICE; k++) g0 += trk[0].v[k].gate && trk[0].v[k].note == 50u; held += g0 >= 1u; }
+                chk(w ? "TRIPLE ARP on the layer: the main sound keeps its note" : "ARP on the layer: the main sound keeps its note", held >= 1990u);
+                trk_note_off(&trk[0], 50); tw_mask = 0; run(3000);
+                { uint32_t g1 = 0; for (k = 0; k < NVOICE; k++) g1 += trk[1].v[k].active && trk[1].v[k].stage != 4u; chk(w ? "TRIPLE ARP layer: nothing left" : "ARP layer: nothing left", !live() && g1 == 0u); }
+            }
+            tw_p[TW_FOOT][3] = 0; host_preset(&trk[1], TRK_DEF[1][0], TRK_DEF[1][1]); trk[1].p[P_LYMODE] = LY_OFF;
+        }
         chk("RATE x2: twice the clock", rhy_warp(4096, 3) == 8192u && rhy_warp(4096, 1) == 2048u);
         { uint32_t r, x, ok = 1, prev; for (r = 5; r < 8u; r++) for (prev = 0, x = 0; x < 6u * 16384u; x += 64u) { uint32_t w = rhy_warp(x, r); ok &= w >= prev; prev = w; }
           chk("RATE SLOW FAST BOUNC: the clock never goes back", ok); }
