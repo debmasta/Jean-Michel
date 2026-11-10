@@ -24,3 +24,13 @@ jobs:
         with:
           name: clipper-debmaster-fwsc
           path: build/felucca.fwsc
+      - name: Symbol sizes
+        run: |
+          "$HOME/.jieli/toolchain/common/bin/objdump" -t build/felucca.elf > build/syms.txt
+          ls build/*.o build/*.elf > build/files.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: symbols
+          path: |
+            build/syms.txt
+            build/files.txt
