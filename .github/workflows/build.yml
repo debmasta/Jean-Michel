@@ -26,4 +26,5 @@ jobs:
           path: build/felucca.fwsc
       - name: Symbol sizes
         run: |
-          "$HOME/.jieli/toolchain/common/bin/objdump" -t build/felucca.elf | awk '$(NF-1) ~ /^[0-9a-f]+$/ && ($3 ~ /text|rodata|data/ || $4 ~ /text|rodata|data/) { printf "SYM %d %s %s\n", strtonum("0x" $(NF-1)), $NF, ($3 ~ /\./ ? $3 : $4) }' | sort -k2 -n -r | head -400
+          "$HOME/.jieli/toolchain/common/bin/objdump" -t build/felucca.elf > build/syms.txt
+          python3 tools/symsizes.py < build/syms.txt
