@@ -335,7 +335,8 @@ UI_SMALL static void tap_tempo(void)
 static void tw_cc_out(void)
 {
     static uint32_t sent;
-    uint32_t i, ch = tw_mask ^ sent;
+    uint32_t i, ch = (tw_mask ^ sent) | tw_cc_force;
+    tw_cc_force = 0;
     for (i = 0; i <= TW_POLY; i++)
         if (((ch >> i) & 1u) && i != TW_ALLOFF && i != TW_CATS && i != TW_SETA && i != TW_SETB && i != TW_RECCLR) {
             uint32_t cc = i < 14u ? 102u + i : i == TW_BLFO ? 118u : i == TW_TARP ? 85u : i == TW_NUA ? 84u : i == TW_FOOT ? 30u : i == TW_POLY ? 31u : 86u, q = ((tw_mask >> i) & 1u) ? 127u : 0u;
@@ -409,8 +410,17 @@ UI_SMALL static void layer_key(uint32_t layer, uint32_t k, uint32_t down)
                 fl_on = !fl_on;
             tw_sel = TW_CATS;
         } else {
-            if (tw_sel == (uint32_t)w || !((tw_mask >> w) & 1u))
-                tw_mask ^= 1u << w;
+            uint32_t b = 1u << w;
+            if (tw_is((uint32_t)w) && (tw_sel == (uint32_t)w || !(tw_mask & b))) {
+                /* off, whoever turned it on: the keys, MIDI (FM-1 PAD, Live), the steps it was recorded on */
+                uint32_t st;
+                tw_mask &= ~b, tw_cc &= ~b, tw_auto_now &= ~b;
+                for (st = 0; st < NSTEP; st++)
+                    tw_auto[st] &= ~b;
+                tw_cc_force |= b;
+            } else if (!tw_is((uint32_t)w)) {
+                tw_mask |= b;
+            }
             tw_sel = (uint8_t)w;
         }
         tw_apply();

@@ -980,6 +980,20 @@ int main(int argc, char **argv)
         tw_mask = 1u << TW_FOOT; for (q = 0; q < 40u; q++) { frame(); seen += screen[8 * 240 + 200] != 0; }
         check(seen > 0u && seen < 40u, "FX dot: blinks while a twist is on");
         tw_mask = 0; frames(4); check(screen[8 * 240 + 200] == 0, "FX dot: gone when nothing is on"); ppm("fx_dot_off");
+        {   /* a twist lit by MIDI and by the steps it was recorded on: its key turns it off */
+            uint32_t k, kp = 99, pg;
+            for (k = 0; k < 40u; k++) if (punch_key(k) == (int32_t)TW_POLY - 16) { kp = k; break; }
+            tw_page = 1; (void)pg;
+            check(kp != 99u, "POLY has a key");
+            tw_cc = 1u << TW_POLY; tw_auto[3] = 1u << TW_POLY; tw_mask = 0;
+            layer_key(LY_FX, kp, 1); layer_key(LY_FX, kp, 0);
+            check(!tw_is(TW_POLY) && !(tw_auto[3] & (1u << TW_POLY)), "lit by MIDI and the steps: its key turns it off");
+            layer_key(LY_FX, kp, 1); layer_key(LY_FX, kp, 0);
+            check(tw_is(TW_POLY), "and on again");
+            layer_key(LY_FX, kp, 1); layer_key(LY_FX, kp, 0);
+            check(!tw_is(TW_POLY), "and off");
+            tw_page = 0;
+        }
         {   /* the ARP page: background, animal, every MODE draws within the screen; BYTE's skull */
             uint32_t pi, m; static const char *const NM[4] = {"arp_up", "arp_dn", "arp_updn", "arp_rnd"};
             ui.force = 1; ui.home = 1; frames(3); ppm("byte_home");

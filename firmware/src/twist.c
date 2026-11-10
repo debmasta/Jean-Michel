@@ -108,7 +108,8 @@ static volatile int32_t tw_cc_semi;
  * RAM only: not saved with the project */
 static uint32_t tw_auto[NSTEP];
 static volatile uint32_t tw_auto_now;
-static volatile uint32_t tw_ch, tw_rm;           /* CHAOS and REMIX: the twists they turn on for a moment, on top of yours */
+static volatile uint32_t tw_ch, tw_rm;
+static uint32_t tw_cc_force;                     /* twists to send as CC again (off) though tw_mask did not change */           /* CHAOS and REMIX: the twists they turn on for a moment, on top of yours */
 static inline int tw_is(uint32_t k) { return ((tw_mask | tw_cc | tw_auto_now | tw_ch | tw_rm) >> k) & 1u; }
 static inline uint32_t tw_v(uint32_t k, uint32_t p) { return tw_p[k][p]; }
 

@@ -1282,6 +1282,7 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
  * below the settings holds them, one copy */
 #define BBU_MAGIC 0x31554242u                         /* the formulas alone */
 #define BBU_MAGIC2 0x32554242u                        /* then the FX window's settings (twist.c tw_p) */
+#define BBU_MAGIC3 0x33554242u                        /* the same, footwork and poly with their RATE */
 static uint32_t bbu_tw_hash, bbu_tw_ms;
 #define BBU_OFF 0xFB000u
 static uint8_t bbu_dirty, bbu_loaded;
@@ -1294,19 +1295,19 @@ UI_SMALL static void bbu_load(void)
         return;
     bbu_loaded = 1;
     tw_init();
-    if (st_read(BBU_OFF, h, sizeof h) || (h[0] != BBU_MAGIC && h[0] != BBU_MAGIC2))
+    if (st_read(BBU_OFF, h, sizeof h) || (h[0] != BBU_MAGIC && h[0] != BBU_MAGIC2 && h[0] != BBU_MAGIC3))
         return;
-    if (h[0] == BBU_MAGIC2) {
+    if (h[0] != BBU_MAGIC) {
         static uint8_t tp[TW_N][TW_NP];
         if (!st_read(BBU_OFF + 12u + sizeof bb_user, tp, sizeof tp) && st_crc32(tp, sizeof tp) == h[2]) {
             for (k = 0; k < TW_N; k++)
                 for (q = 0; q < TW_NP; q++)
-                    if (tp[k][q] < TW_PAR[k][q].n)
+                    if (tp[k][q] < TW_PAR[k][q].n && (h[0] == BBU_MAGIC3 || q != 2u || (k != TW_FOOT && k != TW_POLY)))
                         tw_p[k][q] = tp[k][q];
         }
     }
     bbu_tw_hash = bbu_twh();
-    if (!st_read(BBU_OFF + (h[0] == BBU_MAGIC2 ? 12u : 8u), bb_user, sizeof bb_user) && st_crc32(bb_user, sizeof bb_user) == h[1])
+    if (!st_read(BBU_OFF + (h[0] != BBU_MAGIC ? 12u : 8u), bb_user, sizeof bb_user) && st_crc32(bb_user, sizeof bb_user) == h[1])
         return;
     memset(bb_user, 0, sizeof bb_user);
 }
@@ -1316,7 +1317,7 @@ UI_SMALL static void bbu_save(void)
     _Static_assert(sizeof bb_user + sizeof tw_p + 12u <= 4096u, "one sector");
     bbu_dirty = 0;
     bbu_tw_hash = bbu_twh();
-    h[0] = BBU_MAGIC2, h[1] = st_crc32(bb_user, sizeof bb_user), h[2] = bbu_tw_hash;
+    h[0] = BBU_MAGIC3, h[1] = st_crc32(bb_user, sizeof bb_user), h[2] = bbu_tw_hash;
     if (st_erase(BBU_OFF) || st_prog(BBU_OFF, h, sizeof h) || st_prog(BBU_OFF + 12u, bb_user, sizeof bb_user) ||
         st_prog(BBU_OFF + 12u + sizeof bb_user, tw_p, sizeof tw_p))
         ui_message("U SAVE ERROR");
