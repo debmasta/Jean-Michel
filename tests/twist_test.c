@@ -158,7 +158,14 @@ int main(void)
         tw_p[TW_POLY][0] = 1; tw_mask = 1u << TW_POLY; trk_note_on(&trk[0], 48, 100); run(2000);
         chk("POLY sounds on the two lanes", rhy[0].n == 48u || rhy[1].n == 60u);
         tw_mask = 0; run(40); trk_note_off(&trk[0], 48); run(3000); chk("POLY off, released: nothing left", bounded() && !live());
-        tw_midi_cc(28, 127); chk("CC 28 sets the ratio", tw_p[TW_POLY][0] == 5u); tw_midi_cc(28, 30);
+        tw_midi_cc(28, 127); chk("CC 28 sets the ratio", tw_p[TW_POLY][0] == 11u); tw_midi_cc(28, 30);
+        chk("RATE x2: twice the clock", rhy_warp(4096, 3) == 8192u && rhy_warp(4096, 1) == 2048u);
+        { uint32_t r, x, ok = 1, prev; for (r = 5; r < 8u; r++) for (prev = 0, x = 0; x < 6u * 16384u; x += 64u) { uint32_t w = rhy_warp(x, r); ok &= w >= prev; prev = w; }
+          chk("RATE SLOW FAST BOUNC: the clock never goes back", ok); }
+        chk("SLOW: dense first", rhy_warp(4096, 5) > 4096u && rhy_warp(4096, 6) < 4096u);
+        { uint32_t hits = 0, was = 0, q; quiet(); host_preset(&trk[0], 0u, 0); trk[0].p[P_AMODE] = 0; tw_p[TW_FOOT][0] = 4; tw_p[TW_FOOT][2] = 7; tw_mask = 1u << TW_FOOT;
+          trk_note_on(&trk[0], 48, 100); for (q = 0; q < 3000u; q++) { run(1); if (rhy[0].on && rhy[0].off > (int32_t)was) hits++; was = rhy[0].on ? (uint32_t)rhy[0].off : 0u; }
+          chk("DRILL BOUNC plays", hits > 10u); tw_mask = 0; trk_note_off(&trk[0], 48); run(3000); chk("DRILL BOUNC: nothing left", !live()); tw_p[TW_FOOT][0] = 0; tw_p[TW_FOOT][2] = 2; }
     }
     {   /* VOICE 4 */
         track_t *t = &trk[0]; uint32_t g;

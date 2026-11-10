@@ -44,9 +44,11 @@ static const char *const TN_TSET[] = {"OCTS", "5THS", "DARK", "WIDE"};
 static const char *const TN_MUT[] = {"SOFT", "MID", "WILD"};
 static const char *const TN_NUA[] = {"HAIR", "SOFT", "MID"};
 static const char *const TN_NUM[] = {"FIXED", "EVOLVE", "RND"};
-static const char *const TN_FST[] = {"JUKE", "GHETTO", "ROLLS", "CHOP"};
+static const char *const TN_FST[] = {"JUKE", "GHETTO", "ROLLS", "CHOP", "DRILL", "HALF", "SKIP", "STAGR"};
+/* RATE: footwork and poly slower, faster, or a bar that slows down / speeds up (BOUNC: one then the other) */
+static const char *const TN_RATE[] = {"1/4", "1/2", "x1", "x2", "x3", "SLOW", "FAST", "BOUNC"};
 static const char *const TN_FVR[] = {"0", "25", "50", "75", "100"};
-static const char *const TN_PRT[] = {"3:2", "3:4", "5:4", "7:4", "5:3", "7:5"};
+static const char *const TN_PRT[] = {"3:2", "3:4", "5:4", "7:4", "5:3", "7:5", "2:1", "4:3", "5:2", "9:4", "11:8", "13:8"};
 static const char *const TN_PSP[] = {"SAME", "OCT", "5TH", "WIDE"};
 static const char *const TN_REV[] = {"2", "4", "8", "16"};
 static const char *const TN_RWI[] = {"SOFT", "MID", "WILD"};
@@ -69,8 +71,8 @@ static const tw_par_t TW_PAR[TW_N][TW_NP] = {
     [TW_BLFO] = {{"form", 16, 0, TN_LAB}, {"dest", NN(TN_DEST), 0, TN_DEST}, {"depth", NN(TN_DEPTH), 2, TN_DEPTH}, {"speed", NN(TN_LRATE), 2, TN_LRATE}},
     [TW_TARP] = {{"set", NN(TN_TSET), 0, TN_TSET}, {"rate", NN(TN_ARATE), 2, TN_ARATE}},
     [TW_MUT] = {{"amount", NN(TN_MUT), 1, TN_MUT}},
-    [TW_FOOT] = {{"style", NN(TN_FST), 0, TN_FST}, {"vary", NN(TN_FVR), 2, TN_FVR}},
-    [TW_POLY] = {{"ratio", NN(TN_PRT), 1, TN_PRT}, {"spread", NN(TN_PSP), 1, TN_PSP}},
+    [TW_FOOT] = {{"style", NN(TN_FST), 0, TN_FST}, {"vary", NN(TN_FVR), 2, TN_FVR}, {"rate", NN(TN_RATE), 2, TN_RATE}},
+    [TW_POLY] = {{"ratio", NN(TN_PRT), 1, TN_PRT}, {"spread", NN(TN_PSP), 1, TN_PSP}, {"rate", NN(TN_RATE), 2, TN_RATE}},
     [TW_REMIX] = {{"every", NN(TN_REV), 1, TN_REV}, {"wild", NN(TN_RWI), 1, TN_RWI}},
     [TW_NUA] = {{"amount", NN(TN_NUA), 1, TN_NUA}, {"mode", NN(TN_NUM), 0, TN_NUM}},
 };
@@ -348,14 +350,31 @@ static void rhy_hit(uint32_t l, uint32_t note, uint32_t vel, int32_t gate)
     trk_note_on0(&trk[0], note, vel);
     rhy[l].on = 1, rhy[l].n = (uint8_t)note, rhy[l].off = gate;
 }
+/* the clock of a RATE: x (4096 a beat) scaled, or bent within each bar (a slowing bar: the hits dense first, wide at its end) */
+static uint32_t rhy_warp(uint32_t x, uint32_t r)
+{
+    static const uint8_t M[5] = {1, 2, 4, 8, 12};               /* (quarters) */
+    uint32_t bar, p, w;
+    int32_t k;
+    if (r < 5u)
+        return (uint32_t)((uint64_t)x * M[r] / 4u);
+    bar = x >> 14, p = x & 16383u;
+    k = r == 5u ? 1 : r == 6u ? -1 : (bar & 1u) ? -1 : 1;
+    w = (uint32_t)((int32_t)p + k * (int32_t)((p - p * p / 16384u) * 3u / 4u));
+    return bar << 14 | (w > 16383u ? 16383u : w);
+}
 static void rhy_block(uint32_t adv)
 {
-    static const uint8_t PAT[4][16] = {{1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 2, 0},
+    static const uint8_t PAT[8][16] = {{1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 2, 0},
                                        {1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 3, 0, 1, 1, 0, 3},
                                        {1, 0, 3, 0, 1, 0, 3, 3, 1, 2, 0, 3, 1, 0, 4, 4},
-                                       {1, 0, 0, 0, 2, 0, 0, 3, 0, 0, 1, 0, 2, 2, 3, 0}};
+                                       {1, 0, 0, 0, 2, 0, 0, 3, 0, 0, 1, 0, 2, 2, 3, 0},
+                                       {3, 0, 3, 0, 3, 3, 0, 3, 3, 0, 3, 0, 4, 4, 4, 4},
+                                       {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0},
+                                       {1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 2},
+                                       {1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 2, 3}};
     static const uint8_t RT[5][6] = {{0, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0}, {1, 0, 0, 1, 0, 0}, {1, 0, 1, 0, 1, 0}, {1, 1, 1, 1, 1, 1}};
-    static const uint8_t PA[6] = {3, 3, 5, 7, 5, 7}, PB[6] = {2, 4, 4, 4, 3, 5};
+    static const uint8_t PA[12] = {3, 3, 5, 7, 5, 7, 2, 4, 5, 9, 11, 13}, PB[12] = {2, 4, 4, 4, 3, 5, 1, 3, 2, 4, 8, 8};
     static const int8_t SP[4] = {0, 12, 7, 19};
     uint32_t i, note = 0, vel = 100, have = 0, u;
     for (i = 0; i < 2u; i++)
@@ -392,7 +411,7 @@ static void rhy_block(uint32_t adv)
         u = (uint32_t)(((uint64_t)rhy_free << 8 << 12) / BEAT_U);   /* (T's scale, 2^12 a beat, << 8) */
     }
     if (tw_is(TW_FOOT)) {
-        uint32_t tk = (u >> 8) * 24u / 4096u, sty = tw_v(TW_FOOT, 0), bar, st, sub, c, h;
+        uint32_t tk = rhy_warp(u >> 8, tw_v(TW_FOOT, 2)) * 24u / 4096u, sty = tw_v(TW_FOOT, 0), bar, st, sub, c, h;
         if (tk != rhy_ftick) {
             rhy_ftick = tk;
             bar = tk / 96u, st = (tk % 96u) / 6u, sub = tk % 6u;
@@ -408,7 +427,7 @@ static void rhy_block(uint32_t adv)
     if (tw_is(TW_POLY)) {
         uint32_t r = tw_v(TW_POLY, 0), l, cyc = 2u * 4096u;
         for (l = 0; l < 2u; l++) {
-            uint32_t a = l ? PB[r] : PA[r], k = (u >> 8) * a / cyc;
+            uint32_t a = l ? PB[r] : PA[r], k = (uint32_t)((uint64_t)rhy_warp(u >> 8, tw_v(TW_POLY, 2)) * a / cyc);
             if (k != rhy_pi[l]) {
                 rhy_pi[l] = k;
                 if (!tw_is(TW_FOOT) || l)
@@ -680,6 +699,12 @@ static void tw_apply(void)
 /* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
 static int tw_midi_cc(uint32_t cc, uint32_t v)
 {
+    if (cc == 59u || cc == 60u) {                 /* FOOTWORK rate, POLY rate */
+        uint32_t k = cc == 59u ? TW_FOOT : TW_POLY;
+        tw_init();
+        tw_p[k][2] = (uint8_t)(v * TW_PAR[k][2].n / 128u);
+        return 1;
+    }
     if (cc == 26u || cc == 27u || cc == 28u || cc == 29u) {   /* FOOTWORK style, vary; POLY ratio, spread */
         uint32_t k = cc < 28u ? TW_FOOT : TW_POLY, p = cc & 1u ? 1u : 0u;
         tw_init();
