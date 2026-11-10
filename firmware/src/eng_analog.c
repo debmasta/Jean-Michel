@@ -149,6 +149,13 @@ static const preset_t ANALOG_PRESETS[] = {
     {"WAH LEAD", {0, 8, 64, 0, 60, 70, 20, 64}, {2, 70, 110, 40}, 0, 1, FX(0, 10, 26, 24),
      XP(P_MWDST + 1, MD_WAH, P_LRATE + 1, 70, P_LD_FLT + 1, 20, P_GLIDE + 1, 30)},
 #endif
+    /* Jean-Michel PUNK: the MS-20 way (its filter model, the resonance up to the scream, driven) */
+    {"MS BASS", {0, 8, 40, 0, 40, 92, 92, 50}, {0, 60, 40, 20}, 46, 1, FX(30, 0, 0, 4), XP(P_FMODEL + 1, FM_MS20, P_GLIDE + 1, 20, P_TRANS + 1, -12)},
+    {"MS SCREAM", {0, 0, 0, 0, 58, 118, 108, 64}, {0, 70, 100, 24}, 30, 1, FX(40, 0, 24, 12), XP(P_FMODEL + 1, FM_MS20, P_LRATE + 1, 70, P_LD_FLT + 1, 16, P_GLIDE + 1, 24)},
+    {"MS SYNC", {4, 30, 64, 0, 70, 72, 82, 64}, {0, 66, 90, 22}, 40, 1, FX(24, 0, 20, 10), XP(P_FMODEL + 1, FM_MS20, P_GLIDE + 1, 26)},
+    {"MS NOISE HIT", {0, 0, 0, 127, 80, 108, 100, 64}, {0, 30, 0, 14}, 60, 0, FX(50, 0, 10, 10), XP(P_FMODEL + 1, FM_MS20)},
+    {"MS ZAP", {1, 0, 0, 0, 32, 127, 70, 64}, {0, 26, 0, 10}, 63, 0, FX(20, 0, 16, 8), XP(P_FMODEL + 1, FM_MS20, P_ED_PIT + 1, 40)},
+    {"PUNK STAB", {0, 20, 64, 0, 56, 62, 127, 64}, {0, 46, 30, 14}, 50, 0, FX(60, 0, 14, 16), XP(P_FMODEL + 1, FM_MS20)},
 };
 
 /* (after Clipper 1.2) UNISON (voice.c unison_spread): both oscillators moved by r (Q32) of a turn of the note,

@@ -634,8 +634,8 @@ UI_SMALL static void select_engine(uint32_t e)
 /* the factory presets as one list by kind (basses, keys, organs, pads, leads, plucks and bells, stabs,
  * the rest), then the used user presets: the PRESETS knob and the PRESETS page browse it. By name: an
  * engine's preset table may change order; tests/ui_pages_test.c checks every preset is here once */
-enum { BK_BASS, BK_KEYS, BK_ORGAN, BK_PAD, BK_LEAD, BK_PLUCK, BK_STAB, BK_FX };
-static const char *const BANK_KIND[] = {"BASS", "KEYS", "ORGN", "PAD", "LEAD", "PLCK", "STAB", "FX"};
+enum { BK_BASS, BK_KEYS, BK_ORGAN, BK_PAD, BK_LEAD, BK_PLUCK, BK_STAB, BK_FX, BK_PUNK };
+static const char *const BANK_KIND[] = {"BASS", "KEYS", "ORGN", "PAD", "LEAD", "PLCK", "STAB", "FX", "PUNK"};
 /* the sample-based factory sounds (SAMPLE 4, GRAIN 8): not in the Clipper synth, which has no built-in samples */
 #if CLIPPER_SYNTH
 #define BK_SMP(k, e, n)
@@ -802,6 +802,10 @@ static const struct { uint8_t kind, e; const char *name; } BANK[] = {
     {BK_FX, ENGI_BYTE, "BB 42 MELODY"}, {BK_FX, ENGI_BYTE, "BB SIERPINSKI"}, {BK_FX, ENGI_BYTE, "BB NEUROFUNK"}, {BK_FX, ENGI_BYTE, "BB CROWD"}, {BK_FX, ENGI_BYTE, "BB STEPS"}, {BK_FX, ENGI_BYTE, "BB MELODIE"}, {BK_FX, ENGI_BYTE, "BB METAL"}, {BK_FX, ENGI_BYTE, "BB DUB"}, {BK_FX, ENGI_BYTE, "BB BREAK"}, {BK_FX, ENGI_BYTE, "BB ARP"}, {BK_FX, ENGI_BYTE, "BB GLITCH"}, {BK_FX, ENGI_BYTE, "BB STAIRS"}, {BK_FX, ENGI_BYTE, "BB PWM"}, {BK_FX, ENGI_BYTE, "BB HISS"}, {BK_FX, ENGI_BYTE, "BB KICK LOOP"}, {BK_FX, ENGI_BYTE, "BB HARMONICS"},
     {BK_FX, ENGI_BYTE, "BP KICK"}, {BK_FX, ENGI_BYTE, "BP SNARE"}, {BK_FX, ENGI_BYTE, "BP HAT"}, {BK_FX, ENGI_BYTE, "BP CLAP"}, {BK_FX, ENGI_BYTE, "BP TOM"}, {BK_FX, ENGI_BYTE, "BP RIM"}, {BK_FX, ENGI_BYTE, "BP ZAP"}, {BK_FX, ENGI_BYTE, "BP METAL HIT"},
     {BK_FX, ENGI_GRAB, "GRAB SLICE"}, {BK_FX, ENGI_GRAB, "GRAB PITCH"},
+    /* PUNK: the MS-20 (ANALOG, its filter model MS20) and chiptune through the distortion */
+    {BK_PUNK, 0, "MS BASS"}, {BK_PUNK, 0, "MS SCREAM"}, {BK_PUNK, 0, "MS SYNC"}, {BK_PUNK, 0, "MS NOISE HIT"}, {BK_PUNK, 0, "MS ZAP"},
+    {BK_PUNK, 0, "PUNK STAB"}, {BK_PUNK, 3, "CHIP PUNK"}, {BK_PUNK, 3, "CHIP RIOT"}, {BK_PUNK, 3, "NES SHRED"}, {BK_PUNK, 3, "CHIP KICK"},
+    {BK_PUNK, 3, "GB DIST BASS"}, {BK_PUNK, 3, "1BIT BUZZ"},
     {BK_BASS, ENGI_BYTE, "BK 808 LONG"}, {BK_BASS, ENGI_BYTE, "BK FOOTWORK"}, {BK_BASS, ENGI_BYTE, "BK BOOM"}, {BK_BASS, ENGI_BYTE, "BK DIST"},
 #endif
 };
