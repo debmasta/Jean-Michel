@@ -874,9 +874,9 @@ int main(int argc, char **argv)
         check(pi < NPAGES, "LAYER INS page");
         if (pi < NPAGES) {
             const param_desc_t *d;
-            trk[1].p[P_ITYPE] = 12;
+            trk[1].p[P_ITYPE] = 5;
             syn_desc(PAGES[pi].id[0], &vp); check(vp == &trk[1].p[P_ITYPE], "LAYER INS: TYPE is the layer's");
-            d = syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_IC] && !strcmp(d->label, "ROAR"), "LAYER INS: C named by the layer's type (ROAR)");
+            d = syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_IC] && !strcmp(d->label, "LPF"), "LAYER INS: C named by the layer's type (CRUSH: LPF)");
             trk[1].p[P_ITYPE] = 0;
         }
     }
