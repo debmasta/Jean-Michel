@@ -765,9 +765,10 @@ static void tw_apply(void)
 /* a CC from outside (seq.c midi_cc, the audio ISR); 1 = it was one of these */
 static int tw_midi_cc(uint32_t cc, uint32_t v)
 {
-    if (cc == 75u || cc == 76u || cc == 77u) {   /* BREAK every, wild, rate */
+    if (cc == 63u || cc == 79u || cc == 80u) {   /* BREAK every, wild, rate (75..78: Clipper's own) */
+        uint32_t q = cc == 63u ? 0u : cc - 78u;
         tw_init();
-        tw_p[TW_BREAK][cc - 75u] = (uint8_t)(v * TW_PAR[TW_BREAK][cc - 75u].n / 128u);
+        tw_p[TW_BREAK][q] = (uint8_t)(v * TW_PAR[TW_BREAK][q].n / 128u);
         return 1;
     }
     if (cc == 62u) {                              /* BREAK held */
