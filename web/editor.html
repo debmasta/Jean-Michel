@@ -296,7 +296,8 @@
   /* DUO: SYNTH 1 and SYNTH 2 face to face, a screen each with its knobs, the buttons in the middle (the FM-1 remixed) */
   #p-sound.duo { display: flex; flex-direction: column; }
   #p-sound.duo .heads { order: 1; } #p-sound.duo .duo { order: 2; } #p-sound.duo #jmpanel { order: 3; } #p-sound.duo > *:not(.heads):not(.duo):not(#jmpanel) { order: 4; }
-  #p-sound.duo .s1box, #p-sound.duo .s2box { display: none !important; }
+  #p-sound.duo .s2box, #p-sound.duo .s1box > #groups, #p-sound.duo .s1box > #ctlhelp { display: none !important; }
+  #pmbtn, #titlebtn, #lookbtn { display: none !important; }
   #p-sound.duo .heads .trkhead { opacity: 1; box-shadow: none; cursor: default; }
   #p-sound.duo #jmpanel > h2, #p-sound.duo #jmpanel > p.dim { display: none; } #p-sound.duo #jmpanel { padding-top: 8px; }
   .duo { display: grid; grid-template-columns: 1fr 230px 1fr; gap: 16px; margin: 4px 0 12px; align-items: start; }
@@ -10645,7 +10646,7 @@ setInterval(jmPoll, 700);
 })();
 /* ---- PANNEAU (Jean-Michel): the sound as a synth's front: a tile per button (ENV, LFO, FX ...) with its pages as tabs,
    a little screen each, compact knobs; ⤢ takes a tile out into a floating window (drag it by its title, resize its corner) */
-const PM = { view: localStorage.getItem("jmView") || "duo", z: 50, get on() { return this.view !== "list"; } };
+const PM = { view: "duo", z: 50, get on() { return true; } };   /* (one view: DUO; the tiles live on in the floating windows) */
 function pmApply() {
   $("p-sound").classList.toggle("pm", PM.on);
   $("p-sound").classList.toggle("duo", PM.view === "duo");
