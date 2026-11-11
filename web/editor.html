@@ -193,6 +193,8 @@
   .lypick .kl { color: var(--t1); min-width: 44px; }
   .lypick select { flex: 1; min-width: 0; height: 38px; font-size: 18px; color: var(--t1); background-color: var(--s2); border: 1px solid var(--line); }
   .lypick button { width: 38px; height: 38px; font-size: 22px; line-height: 1; padding: 0; }
+  .wv { display: block; width: 100%; height: 92px; margin: 6px 0 2px; background: radial-gradient(120% 140% at 50% 50%, #0b1030 0%, #04060f 70%); border: 1px solid var(--line); }
+  :root[data-skin="wb"] .wv { border: 2px solid; border-color: var(--wK) var(--wW) var(--wW) var(--wK); background: radial-gradient(120% 140% at 50% 50%, #0b1a44 0%, #000814 75%); }
   #jmpages h3 { margin: 14px 0 0; font-size: inherit; color: var(--t1); }
   .knob { --c: var(--t1); position: relative; padding: 8px 10px 10px; min-width: 0; border-left: 1px solid var(--line);
           display: flex; flex-direction: column; gap: 4px; }
@@ -561,6 +563,7 @@
       <span id="live"></span>
       <span id="mock" hidden data-t="mock"></span>
       <button id="connect" class="pri" data-t="connect" data-ic="port_usb_c"></button>
+      <button id="scopebtn" type="button" title="Une 2e fenêtre pour ton 2e écran : ondes, scope, filtre, multiband (plein écran : F)">ÉCRAN 2</button>
       <button id="skinbtn" type="button" title="Skin : FM-1, Workbench bleu, pétrole, outremer">SKIN</button>
       <div class="links"><a class="dim" href="../installer/" data-t="installer"></a><button class="lang" id="lang"></button></div>
       <button id="install" class="pri" data-t="install" hidden></button>
@@ -5755,7 +5758,8 @@ function buildGroups() {
         if (!rows.length) continue;
         const tt = g.engine && (dev.titles[dev.dump.engine] || [])[g.pages.findIndex((x) => x[0] === title)];
         if (g.pages.length > 1) div.append(el("h3", { ic: PAGE_IC[tt || title], text: tt || title }));
-        div.append(el("div", { class: "knobs" }, ...rows));
+        const kr = el("div", { class: "knobs" }, ...rows);
+        div.append(...wvAttach(title, kr), kr);
         pages++;
       }
       if (pages > 1) div.firstChild.append(el("span", { class: "sub", text: `${pages} ${lang === "ja" ? "ページ" : "pages"}` }));
@@ -10310,7 +10314,7 @@ async function jmProbe() {
       JM.ctl.set(id, { d, input, out });
       row.append(el("div", { class: "knob" + (sel ? " enum" : "") }, el("span", { class: "kl", text: d.label }), out, input));
     }
-    box.append(el("h3", { text: pg.title }), row);
+    box.append(el("h3", { text: pg.title }), ...wvAttach(pg.title, row), row);
   }
   JM.pages = pages;
   $("jmpanel").hidden = false;
@@ -10398,6 +10402,145 @@ async function jmPoll() {
   } finally { JM.polling = false; }
 }
 setInterval(jmPoll, 700);
+/* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
+const WV = { all: new Set(), t0: performance.now(), raf: 0 };
+const WV_KIND = (t) => /^(LAYER )?FX$/.test(t) ? "sends" : /INS|DRIVE|DIST|CRUSH/.test(t) ? "shape"
+  : /FILT|EQ/.test(t) ? "filter" : /^DLY/.test(t) ? "delay" : /REV/.test(t) ? "reverb" : /CHO|SPICE/.test(t) ? "chorus"
+  : /^LFO(?! DEST)/.test(t) ? "lfo" : /^ENV(?! DEST| 2 LOOP)/.test(t) ? "env" : /RHYTHM|VOICE [45]|BYTE MEM/.test(t) ? "bars" : null;
+function wvAttach(title, row) {
+  const kind = WV_KIND(String(title).toUpperCase());
+  if (!kind) return [];
+  const c = el("canvas", { class: "wv" });
+  WV.all.add({ c, row, kind, title: String(title).toUpperCase(), seed: (title.length * 7919) % 97 });
+  if (!WV.raf) WV.raf = requestAnimationFrame(wvFrame);
+  return [c];
+}
+/* ÉCRAN 2 (scope.html): a window of its own for a second monitor, sent the knobs of the pages it draws */
+let wvScope = null;
+$("scopebtn").addEventListener("click", () => {
+  if (wvScope && !wvScope.closed) { wvScope.focus(); return; }
+  wvScope = window.open("scope.html", "jmscope", "popup,width=1280,height=760");
+});
+setInterval(() => {
+  if (!wvScope || wvScope.closed) return;
+  const pages = {};
+  for (const w of WV.all) if (w.c.isConnected) { const v = wvVals(w.row); pages[w.title] = { title: w.title, kind: w.kind, cut: v.get(/CUT|FREQ|TONE|FILT/, 0, 0.6), res: v.get(/RES|Q$/, 1, 0.2), list: v.list }; }
+  try { wvScope.postMessage({ type: "jm", pages }, "*"); } catch (e) {}
+}, 200);
+function wvVals(row) {                              /* the page's knobs, 0..1, by label */
+  const o = { list: [] };
+  for (const k of row.querySelectorAll(".knob")) {
+    const i = k.querySelector("input,select"), l = (k.querySelector(".kl") || {}).textContent || "";
+    if (!i) continue;
+    const n = i.tagName === "SELECT" ? (i.options.length > 1 ? i.selectedIndex / (i.options.length - 1) : 0)
+      : (+i.value - +i.min) / Math.max(1, +i.max - +i.min);
+    o.list.push(n); o[l.toUpperCase()] = n;
+  }
+  o.get = (re, j, df = 0.5) => { for (const k in o) if (k !== "list" && k !== "get" && re.test(k)) return o[k]; return o.list[j] ?? df; };
+  return o;
+}
+const WV_COL = [["#2f7bff", "#ff2fb8", "#ffb31f"], ["#22e6ff", "#7b5cff", "#ff4fd8"], ["#ff5a1f", "#ffd21f", "#ff2f6a"], ["#2fffa0", "#22c4ff", "#b05cff"]];
+function wvFrame(now) {
+  WV.raf = 0;
+  const tt = (now - WV.t0) / 1000;
+  for (const w of WV.all) {
+    if (!w.c.isConnected) { WV.all.delete(w); continue; }
+    const r = w.c.getBoundingClientRect();
+    if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
+    const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+    if (w.c.width !== W || w.c.height !== H) { w.c.width = W; w.c.height = H; }
+    wvDraw(w.c.getContext("2d"), W, H, w.kind, wvVals(w.row), tt, WV_COL[w.seed % WV_COL.length], dpr);
+  }
+  if (WV.all.size) WV.raf = requestAnimationFrame((n) => setTimeout(() => wvFrame(n), 16));
+}
+function wvGrad(g, W, cols) { const x = g.createLinearGradient(0, 0, W, 0); cols.forEach((c, i) => x.addColorStop(i / (cols.length - 1), c)); return x; }
+function wvStroke(g, pts, col, w, dpr) {           /* a glowing line: a wide soft pass, then the bright core */
+  g.lineJoin = "round"; g.lineCap = "round";
+  for (const [lw, a, b] of [[w * 5, 0.18, 14], [w * 2, 0.5, 6], [w, 1, 0]]) {
+    g.globalAlpha = a; g.lineWidth = lw * dpr; g.shadowBlur = b * dpr; g.shadowColor = typeof col === "string" ? col : "#fff"; g.strokeStyle = col;
+    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+  }
+  g.globalAlpha = 1; g.shadowBlur = 0;
+}
+function wvMirror(g, W, H, amp, col, dpr, bars) {  /* a mirrored glowing waveform around the middle (amp(x 0..1) -> 0..1) */
+  const m = H / 2, n = bars || Math.floor(W / (3 * dpr));
+  g.fillStyle = col; g.shadowColor = "#ffffff"; 
+  for (let i = 0; i < n; i++) {
+    const x = (i + 0.5) / n, a = Math.max(0.02, Math.min(1, amp(x))) * (m - 4 * dpr), bw = bars ? (W / n) * 0.62 : 1.6 * dpr;
+    g.globalAlpha = 0.25; g.shadowBlur = 10 * dpr; g.fillRect(x * W - bw, m - a * 1.08, bw * 2, a * 2.16);
+    g.globalAlpha = 0.95; g.shadowBlur = 0; g.fillRect(x * W - bw / 2, m - a, bw, a * 2);
+  }
+  g.globalAlpha = 1; g.shadowBlur = 0;
+}
+function wvDraw(g, W, H, kind, v, t, cols, dpr) {
+  g.clearRect(0, 0, W, H);
+  g.globalCompositeOperation = "lighter";
+  const m = H / 2, A = m * 0.82, grad = wvGrad(g, W, cols), N = 220;
+  const line = (f) => Array.from({ length: N + 1 }, (_, i) => [i / N * W, m - f(i / N) * A]);
+  const noise = (x) => { const s = Math.sin(x * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  if (kind === "shape") {                           /* distortion / insert: a sine through the drive, crushed by the bits */
+    const dr = v.get(/DRIVE|AMT|GAIN|DIST|A$/, 0), cr = v.get(/BIT|CRUSH|B$/, 1, 0), ty = v.get(/TYPE/, 2, 0);
+    const k = 1 + dr * 14, q = cr > 0.05 ? Math.max(2, Math.round(32 * (1 - cr))) : 0;
+    const f = (x) => { let y = Math.sin(x * Math.PI * 6 + t * 2.2) * (0.7 + 0.3 * Math.sin(x * 3 + t));
+      y = ty > 0.5 ? Math.sin(y * k * 0.6) : Math.tanh(y * k) / Math.tanh(k); if (q) y = Math.round(y * q) / q; return y * 0.95; };
+    wvStroke(g, line((x) => f(x) * 0.55 + 0.04 * Math.sin(t * 9 + x * 40) * dr), cols[1], 1, dpr);
+    wvStroke(g, line(f), grad, 2.2, dpr);
+  } else if (kind === "filter") {                   /* the response: cutoff and resonance peak, filled below */
+    const fc = v.get(/CUT|FREQ|TONE|FILT/, 0, 0.6), rs = v.get(/RES|Q$/, 1, 0.2);
+    const resp = (x) => { const r = x / Math.max(0.03, fc), d = Math.sqrt((1 - r * r) ** 2 + (r / (0.6 - 0.55 * rs + 0.05)) ** 2 * 0.3);
+      return Math.min(1.9, 1 / Math.max(0.05, d)) * 0.5 - 0.25; };
+    const pts = line((x) => resp(Math.pow(x, 1.6)) + 0.01 * Math.sin(t * 3 + x * 20));
+    const fill = g.createLinearGradient(0, 0, 0, H); fill.addColorStop(0, cols[1] + "aa"); fill.addColorStop(1, cols[0] + "00");
+    g.fillStyle = fill; g.beginPath(); g.moveTo(0, H); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, H); g.fill();
+    wvStroke(g, pts, grad, 2, dpr);
+  } else if (kind === "delay") {                    /* the repeats: a hit, then echoes spaced by TIME, fading by FDBK */
+    const tm = v.get(/TIME|DLY$|RATE/, 0, 0.4), fb = v.get(/FDBK|FB|FEED/, 1, 0.5), mx = v.get(/MIX|LEVEL|WET|AMT/, 2, 0.6);
+    const gap = 0.06 + tm * 0.22, roll = (t * 0.12) % 1;
+    wvMirror(g, W, H, (x) => { let a = 0; for (let k = 0, p = 0.04; p < 1.2 && k < 24; k++, p += gap) {
+        const amp = (k ? mx * Math.pow(0.25 + fb * 0.72, k) : 1), dx = x - p + roll * gap - gap;
+        if (dx > 0) a += amp * Math.exp(-dx * 90) * (0.6 + 0.4 * noise(x * 50 + k)); } return a; }, grad, dpr);
+  } else if (kind === "reverb") {                   /* the tail: a hit and a long dense decay */
+    const sz = v.get(/SIZE|TIME|DECAY|ROOM/, 1, 0.6), mx = v.get(/MIX|LEVEL|WET|AMT|REV/, 0, 0.5), dp = v.get(/DAMP|TONE|HI/, 2, 0.5);
+    const ph = (t * 0.15) % 1;
+    wvMirror(g, W, H, (x) => { const d = (x - 0.08 + ph * 0.3 + 1) % 1; return d < 0.02 ? 1 : (0.35 + 0.65 * mx) * Math.exp(-d * (1.5 + (1 - sz) * 9))
+      * (0.35 + 0.65 * noise(Math.floor(x * 140) + Math.floor(t * (6 + dp * 10)))); }, grad, dpr);
+  } else if (kind === "chorus") {                   /* voices drifting against each other */
+    const dp = v.get(/DEPTH|AMT|DPTH/, 1, 0.5), rt = v.get(/RATE|SPD/, 0, 0.4);
+    for (let k = 0; k < 3; k++) wvStroke(g, line((x) => 0.7 * Math.sin(x * Math.PI * 5 + t * (1 + rt * 4) * (k + 1) * 0.5 + k * dp * 2.4)
+      * (0.8 + 0.2 * Math.cos(x * 4 + k))), cols[k], 1.6, dpr);
+  } else if (kind === "sends") {                    /* the layer's sends: one lane each (DST CHO DLY REV) */
+    const n = Math.max(1, v.list.length);
+    v.list.forEach((a, k) => { const y0 = (k + 0.5) / n * H, cl = WV_COL[k % 4][1];
+      wvStroke(g, Array.from({ length: N + 1 }, (_, i) => { const x = i / N; return [x * W, y0 - (H / n) * 0.42 * a * Math.sin(x * 40 + t * (3 + k)) *
+        Math.pow(Math.abs(Math.sin(x * 7 + t * 0.7 + k)), 6)]; }), cl, 1.4, dpr); });
+  } else if (kind === "lfo") {                      /* the LFO's shape, at its rate */
+    const wvn = v.get(/WAVE|SHAPE/, 0, 0), rt = v.get(/RATE|SPD|SPEED/, 1, 0.4), dp = v.get(/DEPTH|AMT/, 2, 0.8);
+    const sh = Math.round(wvn * 4), cyc = 1 + rt * 7;
+    const f = (x) => { const p = (x * cyc + t * 0.5) % 1;
+      return dp * (sh === 0 ? Math.sin(p * 2 * Math.PI) : sh === 1 ? 1 - 4 * Math.abs(p - 0.5) : sh === 2 ? 1 - 2 * p : sh === 3 ? (p < 0.5 ? 1 : -1) : noise(Math.floor(x * cyc * 2 + t)) * 2 - 1) * 0.9; };
+    wvStroke(g, line(f), grad, 2.2, dpr);
+  } else if (kind === "env") {                      /* ATK DEC SUS REL */
+    const [a, d, s, r] = [v.get(/ATK|ATT/, 0, 0.1), v.get(/DEC/, 1, 0.3), v.get(/SUS/, 2, 0.6), v.get(/REL/, 3, 0.4)];
+    const tot = a + d + 0.35 + r + 0.01, xa = a / tot, xd = xa + d / tot, xs = xd + 0.35 / tot;
+    const f = (x) => (x < xa ? x / Math.max(1e-3, xa) : x < xd ? 1 - (1 - s) * (x - xa) / Math.max(1e-3, xd - xa) : x < xs ? s : s * Math.max(0, 1 - (x - xs) / Math.max(1e-3, 1 - xs))) * 1.8 - 0.9;
+    const pts = line(f), fill = g.createLinearGradient(0, 0, 0, H); fill.addColorStop(0, cols[2] + "88"); fill.addColorStop(1, cols[0] + "00");
+    g.fillStyle = fill; g.beginPath(); g.moveTo(0, H); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, H); g.fill();
+    wvStroke(g, pts, grad, 2, dpr);
+    const px = ((t * 0.3) % 1) * W; g.fillStyle = "#fff"; g.shadowBlur = 12 * dpr; g.shadowColor = cols[1];
+    g.beginPath(); g.arc(px, m - f(px / W) * A, 3 * dpr, 0, 7); g.fill(); g.shadowBlur = 0;
+  } else {                                          /* rhythm / voice: an equalizer of pulses, its pattern from the knobs */
+    const s = v.list.reduce((p, x, i) => p + x * (i + 1), 0), n = 32, beat = Math.floor(t * 4);
+    g.fillStyle = grad;
+    for (let i = 0; i < n; i++) {
+      const on = noise(i * 3.1 + Math.floor(s * 17)) < 0.35 + (v.list[1] || 0.3) * 0.5, hot = (i % 16) === beat % 16;
+      const h = (on ? 0.35 + 0.65 * noise(i + s) : 0.08) * (hot ? 1 : 0.75) * H * 0.9, x = (i + 0.15) / n * W, bw = W / n * 0.7;
+      g.globalAlpha = hot ? 1 : 0.7; g.shadowBlur = hot ? 14 * dpr : 4 * dpr; g.shadowColor = cols[1];
+      g.fillRect(x, H - h - 3 * dpr, bw, h);
+    }
+    g.globalAlpha = 1; g.shadowBlur = 0;
+  }
+  g.globalCompositeOperation = "source-over";
+}
 libInit();
 if (!MOCK && !navigator.requestMIDIAccess) sayK("nomidi");
 })();
