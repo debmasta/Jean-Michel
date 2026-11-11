@@ -201,6 +201,46 @@
   .trkvol { display: flex; align-items: center; gap: 8px; flex: 0 1 260px; }
   .trkvol input { flex: 1; } .trkvol b { min-width: 3ch; text-align: right; }
   :root[data-skin="wb"] .trkhead { background: var(--wW); color: var(--wB); border-left-color: var(--wO); }
+  /* the screens and the block titles: looks to choose from (html data-look: verre, crt, machine) */
+  .scr { position: relative; margin: 6px 0 2px; } .scr .wv { margin: 0; }
+  #p-sound.pm .scr { margin: 2px 0 4px; }
+  :root[data-look] .group > h2 .sub { opacity: .7; }
+  /* VERRE: a thick glass over the screen, a dark bezel with relief */
+  :root[data-look="verre"] .scr { padding: 5px; border-radius: 7px; background: linear-gradient(145deg, #4a4d55, #15161a 55%, #2c2e33);
+    box-shadow: inset 0 1px 0 #ffffff30, inset 0 -1px 0 #00000080, 0 3px 8px #0008; }
+  :root[data-look="verre"] .scr .wv { border: 0 !important; border-radius: 4px; box-shadow: inset 0 0 14px #000; }
+  :root[data-look="verre"] .scr::after { content: ""; position: absolute; inset: 5px; border-radius: 4px; pointer-events: none;
+    background: linear-gradient(160deg, #ffffff2e 0%, #ffffff10 28%, #ffffff00 29%, #ffffff00 70%, #ffffff0a 100%);
+    box-shadow: inset 0 1px 1px #ffffff40, inset 0 -2px 6px #00000060; }
+  :root[data-look="verre"] .group > h2 { font-size: 15px !important; letter-spacing: 3px; text-transform: uppercase; color: #e8ecf5;
+    margin: -8px -10px 8px !important; padding: 7px 10px 6px 14px; position: relative;
+    background: linear-gradient(#26282e, #17181c); border-bottom: 2px solid var(--wO, #ff9a1f); box-shadow: inset 0 1px 0 #ffffff1c; }
+  :root[data-look="verre"] .group > h2::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--wO, #ff9a1f); }
+  :root[data-look="verre"] .group > h2 svg, :root[data-look="verre"] .group > h2 .ic { filter: brightness(1.4); }
+  /* CRT: a curved tube, scan lines, a vignette */
+  :root[data-look="crt"] .scr { padding: 6px; border-radius: 14px; background: #0b0b0c; box-shadow: inset 0 0 0 2px #2a2a2e, 0 0 0 3px #000, 0 4px 10px #0009; }
+  :root[data-look="crt"] .scr .wv { border: 0 !important; border-radius: 10px / 16px; }
+  :root[data-look="crt"] .scr::after { content: ""; position: absolute; inset: 6px; border-radius: 10px / 16px; pointer-events: none;
+    background: repeating-linear-gradient(#0000 0 2px, #00000055 2px 3px), radial-gradient(ellipse at center, #0000 55%, #000a 100%);
+    box-shadow: inset 0 0 18px #000c; }
+  :root[data-look="crt"] .group > h2 { font-size: 16px !important; letter-spacing: 2px; text-transform: uppercase; color: #000 !important;
+    display: inline-flex !important; margin: -8px 0 8px -10px !important; padding: 5px 22px 5px 12px; background: var(--wO, #ff9a1f);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+  :root[data-look="crt"] .group > h2 .fbtn { color: #000; }
+  :root[data-look="crt"] .group { padding-top: 8px; }
+  /* MACHINE: the screen set in a brushed grey plate with four screws, the title silkscreened with a rule */
+  :root[data-look="machine"] .scr { padding: 8px 10px; background: repeating-linear-gradient(90deg, #8d9097 0 1px, #9a9da4 1px 3px);
+    border: 1px solid #5d6068; box-shadow: inset 0 1px 0 #d6d8dc, inset 0 -1px 0 #4a4c52; }
+  :root[data-look="machine"] .scr::before { content: ""; position: absolute; inset: 3px; pointer-events: none;
+    background: radial-gradient(circle at 3px 3px, #3a3c42 1.6px, #0000 2.2px) 0 0 / 100% 100% no-repeat,
+                radial-gradient(circle at calc(100% - 3px) 3px, #3a3c42 1.6px, #0000 2.2px),
+                radial-gradient(circle at 3px calc(100% - 3px), #3a3c42 1.6px, #0000 2.2px),
+                radial-gradient(circle at calc(100% - 3px) calc(100% - 3px), #3a3c42 1.6px, #0000 2.2px); }
+  :root[data-look="machine"] .scr .wv { border: 2px solid #1a1b1e !important; box-shadow: inset 0 0 10px #000; }
+  :root[data-look="machine"] .group > h2 { font-size: 13px !important; letter-spacing: 4px; text-transform: uppercase; color: #e8ecf5;
+    display: flex; align-items: center; gap: 10px; }
+  :root[data-look="machine"] .group > h2::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, #e8ecf5, #e8ecf500); order: 1; }
+  :root[data-look="machine"] .group > h2 .fbtn { order: 2; margin-left: 0; }
   /* PANNEAU: tiles */
   #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
   #p-sound.pm #jmpages { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
@@ -609,6 +649,7 @@
       <span id="mock" hidden data-t="mock"></span>
       <button id="connect" class="pri" data-t="connect" data-ic="port_usb_c"></button>
       <button id="scopebtn" type="button" title="Une 2e fenêtre pour ton 2e écran : ondes, scope, filtre, multiband (plein écran : F)">ÉCRAN 2</button>
+      <button id="lookbtn" type="button" title="le look des écrans et des titres : verre, crt, machine">écrans</button>
       <button id="skinbtn" type="button" title="Skin : FM-1, Workbench bleu, pétrole, outremer">SKIN</button>
       <div class="links"><a class="dim" href="../installer/" data-t="installer"></a><button class="lang" id="lang"></button></div>
       <button id="install" class="pri" data-t="install" hidden></button>
@@ -978,6 +1019,8 @@
   </main>
 </div>
 <script>
+/* Jean-Michel: the screens' look (?look= or localStorage jmLook): verre, crt, machine */
+document.documentElement.dataset.look = new URLSearchParams(location.search).get("look") || localStorage.getItem("jmLook") || "verre";
 /* Jean-Michel: the logo is the FM-1's intro cat (splash.c), its fur t*(42&t>>10) sliding through the colours */
 document.addEventListener("DOMContentLoaded", () => {
   const b = document.querySelector(".brand"); if (!b) return;
@@ -10541,6 +10584,8 @@ function pmFloat(gdiv) {
   });
 }
 function pmDock(win) { const g = win.querySelector(".group"); if (win.ph.isConnected) win.ph.replaceWith(g); win.remove(); }
+$("lookbtn").addEventListener("click", () => { const L = ["verre", "crt", "machine"], r = document.documentElement;
+  r.dataset.look = L[(L.indexOf(r.dataset.look) + 1) % L.length]; localStorage.setItem("jmLook", r.dataset.look); });
 $("pmbtn").addEventListener("click", () => { PM.on = !PM.on; localStorage.setItem("jmView", PM.on ? "pm" : "list"); pmApply(); });
 new MutationObserver(() => { for (const w of document.querySelectorAll(".fwin")) if (!w.ph.isConnected) w.remove(); pmApply(); })
   .observe($("groups"), { childList: true });
@@ -10557,7 +10602,7 @@ function wvAttach(title, row) {
   const c = el("canvas", { class: "wv" });
   WV.all.add({ c, row, kind, title: String(title).toUpperCase(), seed: (title.length * 7919) % 97 });
   if (!WV.raf) WV.raf = requestAnimationFrame(wvFrame);
-  return [c];
+  return [el("div", { class: "scr" }, c)];
 }
 /* ÉCRAN 2 (scope.html): a window of its own for a second monitor, sent the knobs of the pages it draws */
 let wvScope = null;

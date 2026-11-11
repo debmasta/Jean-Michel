@@ -59,6 +59,18 @@ int main(void)
             chk(ed_out[9] == 0u, "JM_SOUNDS: past the end, none");
             (void)k;
         }
+        {   /* JM_TWP: an FX's settings, read and set (FOOTWORK: style vary rate on) */
+            f[3] = 106; f[4] = TW_FOOT; ed_handle(f, 5);
+            chk(ed_out[4] == 106u && ed_out[5] == TW_FOOT && ed_out[6] == 4u && !strcmp((const char *)&ed_out[7], "style"), "JM_TWP: footwork's 4 settings");
+            f[4] = TW_FOOT; f[5] = 1; f[6] = 3; ed_handle(f, 7);
+            chk(tw_p[TW_FOOT][1] == 3u, "JM_TWP: set VARY");
+            f[5] = 1; f[6] = 99; ed_handle(f, 7);
+            chk(tw_p[TW_FOOT][1] == 4u, "JM_TWP: clamped");
+            f[4] = TW_N; ed_handle(f, 5);
+            chk(ed_out[5] == 0x7Fu, "JM_TWP: no such FX");
+            f[4] = TW_STAIR; ed_handle(f, 5);
+            chk(ed_out[6] == 3u, "JM_TWP: stair's 3 (with its 19 scales, in one reply)");
+        }
         f[3] = 104; f[4] = 1; f[5] = TW_POLY; ed_handle(f, 6);
         chk(tw_is(TW_POLY), "JM_FX: POLY on");
         f[4] = 2; ed_handle(f, 6);

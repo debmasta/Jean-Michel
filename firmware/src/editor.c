@@ -969,6 +969,33 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
         }
         break;
     }
+    case 106: {                                            /* JM_TWP n [k v]: an FX's settings (as the FX window), set one; -> n, count, (label, n, value, names) */
+        uint32_t tn = na ? a[0] : 0u, k, c = 0;
+        if (tn >= TW_N) {
+            ed_b(0x7Fu);
+            break;
+        }
+        tw_init();
+        if (na >= 3u && a[1] < TW_NP && TW_PAR[tn][a[1]].n) {
+            tw_p[tn][a[1]] = (uint8_t)(a[2] < TW_PAR[tn][a[1]].n ? a[2] : TW_PAR[tn][a[1]].n - 1u);
+            tw_apply();
+        }
+        for (k = 0; k < TW_NP; k++)
+            if (TW_PAR[tn][k].n)
+                c = k + 1u;
+        ed_b(tn);
+        ed_b(c);
+        for (k = 0; k < c; k++) {
+            const tw_par_t *pa = &TW_PAR[tn][k];
+            uint32_t j;
+            ed_str(pa->n ? pa->lab : "", 8);
+            ed_b(pa->n);
+            ed_b(tw_p[tn][k]);
+            for (j = 0; j < pa->n; j++)
+                ed_str(pa->names[j], 8);
+        }
+        break;
+    }
     case 105: {                                            /* JM_SOUNDS from (v14): total, from, n, then kind, name per sound */
         uint32_t tot = NBANK + up_count(), from = na >= 2u ? (uint32_t)(a[0] | (uint32_t)a[1] << 7) : 0u, n;
         char un[13];
