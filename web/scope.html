@@ -25,7 +25,7 @@
 <div class="bar">
   <b>ÉCRAN 2</b>
   <button data-m="0">1 ONDES</button><button data-m="1">2 SCOPE</button><button data-m="2">3 FILTRE</button><button data-m="3">4 MULTIBAND</button>
-  <button id="auto">AUTO</button>
+  <button id="auto">AUTO</button><button id="theme" title="le look (T)">THÈME</button>
   <span class="sp"></span>
   <span id="msg"></span>
   <select id="src"></select>
@@ -40,7 +40,32 @@
 const $ = (id) => document.getElementById(id);
 const cv = $("cv"), g = cv.getContext("2d");
 const S = { mode: +(localStorage.getItem("jmScopeMode") || 0), auto: false, autoT: 0, x: [180, 2200], drag: -1, pages: {}, hist: [[], [], [], []] };
-const COLS = ["#2f7bff", "#ff2fb8", "#ffb31f", "#22e6ff"], BAND = ["#ff2f6a", "#ffd21f", "#22e6ff"];
+/* the looks (THÈME, or ?theme=): néon on night blue, graphite, concrete, riso paper, Workbench grey */
+const THEMES = {
+  neon: { name: "NÉON", bg: ["#0b1238", "#02030a"], radial: true, comp: "lighter", glow: 1, ink: "#ffffff", txt: "#e8f0ff", dim: "#5a73a0", grid: "#1a2550", meter: "#0a1230",
+    cols: ["#2f7bff", "#ff2fb8", "#ffb31f", "#22e6ff"], band: ["#ff2f6a", "#ffd21f", "#22e6ff"], bar: 0.55 },
+  graphite: { name: "GRAPHITE", bg: ["#2e2f31", "#232426"], comp: "source-over", glow: 0.22, ink: "#ece6da", txt: "#ece6da", dim: "#8a8780", grid: "#3a3b3e", meter: "#1c1d1f",
+    cols: ["#5b7fc0", "#c8678f", "#d9a441", "#4fa59b"], band: ["#e4684f", "#d9a441", "#4fa59b"], bar: 0.5, grain: 0.06 },
+  beton: { name: "BÉTON", bg: ["#c4c3be", "#b3b2ad"], comp: "source-over", glow: 0, ink: "#1d1d1f", txt: "#1d1d1f", dim: "#5f5e5a", grid: "#9b9a95", meter: "#8f8e89",
+    cols: ["#2f5fa8", "#c23b6e", "#d68a1c", "#16857a"], band: ["#cf3f2a", "#d68a1c", "#16857a"], bar: 0.7, grain: 0.08 },
+  riso: { name: "RISO", bg: ["#efe9dc", "#e6dfcf"], comp: "multiply", glow: 0, ink: "#262224", txt: "#262224", dim: "#8b8478", grid: "#d6cebd", meter: "#ddd5c4",
+    cols: ["#0078bf", "#ff48b0", "#ffd400", "#00a95c"], band: ["#ff48b0", "#ffd400", "#0078bf"], bar: 0.8, grain: 0.1, mis: 3 },
+  wb: { name: "WORKBENCH", bg: ["#a2a2a2", "#a2a2a2"], comp: "source-over", glow: 0, ink: "#000000", txt: "#000000", dim: "#4e4e4e", grid: "#8a8a8a", meter: "#6f6f6f",
+    cols: ["#0055aa", "#ff8a00", "#ffffff", "#0055aa"], band: ["#0055aa", "#ff8a00", "#ffffff"], bar: 1, pixel: 4, bevel: true },
+};
+const TK = Object.keys(THEMES);
+let T = THEMES[new URLSearchParams(location.search).get("theme") || localStorage.getItem("jmScopeTheme") || "graphite"] || THEMES.graphite;
+let COLS = T.cols, BAND = T.band;
+function setTheme(k) { T = THEMES[k] || THEMES.graphite; COLS = T.cols; BAND = T.band; localStorage.setItem("jmScopeTheme", k);
+  const th = document.getElementById("theme"); if (th) th.textContent = T.name; }
+let grainC = null;
+function grain(W, H, dpr) {                          /* a still film of noise over the flat looks */
+  if (!T.grain) return;
+  if (!grainC) { grainC = document.createElement("canvas"); grainC.width = grainC.height = 256; const q = grainC.getContext("2d"), im = q.createImageData(256, 256);
+    for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } q.putImageData(im, 0, 0); }
+  g.globalCompositeOperation = "overlay"; g.globalAlpha = T.grain; g.fillStyle = g.createPattern(grainC, "repeat"); g.fillRect(0, 0, W, H);
+  g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
+}
 let ac, src, an, bands = [], low = [], cross = [], demo = null, stream = null;
 
 function audio() {
@@ -113,10 +138,14 @@ const buf = new Float32Array(4096), fbuf = new Float32Array(2048), bb = new Floa
 const rms = (a, n = a.length) => { let s = 0; for (let i = 0; i < n; i++) s += a[i] * a[i]; return Math.sqrt(s / n); };
 const fx = (f, W) => (Math.log(f / 20) / Math.log(20000 / 20)) * W, xf = (x, W) => 20 * (20000 / 20) ** (x / W);
 function glow(pts, col, w, dpr, close) {
-  g.lineJoin = g.lineCap = "round";
-  for (const [lw, a, b] of [[w * 5, 0.16, 18], [w * 2, 0.45, 8], [w, 1, 0]]) {
-    g.globalAlpha = a; g.lineWidth = lw * dpr; g.shadowBlur = b * dpr; g.shadowColor = typeof col === "string" ? col : "#fff"; g.strokeStyle = col;
-    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); if (close) g.closePath(); g.stroke();
+  g.lineJoin = g.lineCap = T.pixel ? "miter" : "round";
+  const passes = T.glow ? [[w * 5, 0.16 * T.glow, 18 * T.glow], [w * 2, 0.45 * T.glow, 8 * T.glow], [w, 1, 0]] : [[w * (T.pixel ? 1.4 : 1.2), 1, 0]];
+  if (T.mis) passes.unshift([w * 1.2, 0.55, 0, T.mis]);
+  for (const [lw, a, b, off] of passes) {
+    g.globalAlpha = a; g.lineWidth = lw * dpr; g.shadowBlur = b * dpr; g.shadowColor = typeof col === "string" ? col : "#fff";
+    g.strokeStyle = off ? (typeof col === "string" ? T.cols[1] : T.cols[0]) : col;
+    const o = (off || 0) * dpr;
+    g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x + o, y + o) : g.moveTo(x + o, y + o))); if (close) g.closePath(); g.stroke();
   }
   g.globalAlpha = 1; g.shadowBlur = 0;
 }
@@ -125,9 +154,10 @@ function mirrorBars(x0, y, W, h, vals, col, dpr) {   /* glowing mirrored bars, t
   const n = vals.length, bw = Math.max(1, W / n);
   g.fillStyle = col;
   for (let i = 0; i < n; i++) {
-    const a = Math.min(1, vals[i]) * h, x = x0 + i * bw;
-    g.globalAlpha = 0.22; g.shadowBlur = 14 * dpr; g.shadowColor = "#fff"; g.fillRect(x - bw * 0.3, y - a * 1.1, bw * 1.2, a * 2.2);
-    g.globalAlpha = 0.95; g.shadowBlur = 0; g.fillRect(x + bw * 0.2, y - a, Math.max(1, bw * 0.55), a * 2);
+    let a = Math.min(1, vals[i]) * h; const x = x0 + i * bw;
+    if (T.pixel) a = Math.round(a / (T.pixel * dpr)) * T.pixel * dpr;
+    if (T.glow) { g.globalAlpha = 0.22 * T.glow; g.shadowBlur = 14 * dpr * T.glow; g.shadowColor = "#fff"; g.fillRect(x - bw * 0.3, y - a * 1.1, bw * 1.2, a * 2.2); }
+    g.globalAlpha = 0.95; g.shadowBlur = 0; g.fillRect(x + bw * (1 - T.bar) / 2, y - a, Math.max(1, bw * T.bar), a * 2);
   }
   g.globalAlpha = 1;
 }
@@ -141,24 +171,25 @@ function frame() {
   const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
   if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
   if (S.auto && performance.now() - S.autoT > 9000) { S.autoT = performance.now(); setMode((S.mode + 1) % 4); }
-  const bgq = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  bgq.addColorStop(0, "#0b1238"); bgq.addColorStop(1, "#02030a");
+  const bgq = T.radial ? g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7) : g.createLinearGradient(0, 0, 0, H);
+  bgq.addColorStop(0, T.bg[0]); bgq.addColorStop(1, T.bg[1]);
   g.globalCompositeOperation = "source-over"; g.fillStyle = bgq; g.fillRect(0, 0, W, H);
-  if (!an) { label("clique n'importe où pour démarrer le son", W * 0.5 - 200 * dpr, H / 2, "#5a73a0", dpr, 16); return; }
+  if (!an) { label("clique n'importe où pour démarrer le son", W * 0.5 - 200 * dpr, H / 2, T.dim, dpr, 16); return; }
   an.getFloatTimeDomainData(buf);
   const lv = [rms(buf)].concat(bands.map((b) => (b.getFloatTimeDomainData(bb), rms(bb))));
   S.hist.forEach((h, i) => { h.push(lv[i]); if (h.length > 260) h.shift(); });
-  g.globalCompositeOperation = "lighter";
+  g.globalCompositeOperation = T.comp;
   [ondes, scope, filtre, multiband][S.mode](W, H, dpr, lv);
   g.globalCompositeOperation = "source-over";
+  grain(W, H, dpr);
 }
 function ondes(W, H, dpr) {                          /* four lanes: the sound, then LOW MID HIGH, scrolling like a recorder */
   const names = ["FM-1", "LOW", "MID", "HIGH"], cols = [grad(0, W, COLS.slice(0, 3)), BAND[0], BAND[1], BAND[2]];
   for (let k = 0; k < 4; k++) {
     const y = H * (0.2 + k * 0.2), h = H * (k ? 0.07 : 0.11), gain = k ? 7 : 4;
     mirrorBars(W * 0.08, y, W * 0.84, h, S.hist[k].map((v) => v * gain), cols[k], dpr);
-    g.globalAlpha = 0.5; g.fillStyle = typeof cols[k] === "string" ? cols[k] : "#fff"; g.fillRect(W * 0.08, y - dpr * 0.5, W * 0.84, dpr); g.globalAlpha = 1;
-    label(names[k], W * 0.02, y + 5 * dpr, k ? BAND[k - 1] : "#e8f0ff", dpr, 14);
+    g.globalAlpha = 0.5; g.fillStyle = typeof cols[k] === "string" ? cols[k] : T.ink; g.fillRect(W * 0.08, y - dpr * 0.5, W * 0.84, dpr); g.globalAlpha = 1;
+    label(names[k], W * 0.02, y + 5 * dpr, k ? BAND[k - 1] : T.txt, dpr, 14);
   }
 }
 function scope(W, H, dpr, lv) {                      /* the waveform itself, mirrored, with a glow that breathes with the level */
@@ -168,30 +199,30 @@ function scope(W, H, dpr, lv) {                      /* the waveform itself, mir
   const n = 1400, pts = [], m = H / 2, A = H * 0.36 * 0.6 / S.pk;
   for (let i = 0; i < n; i++) pts.push([W * 0.04 + (i / n) * W * 0.92, m - buf[z + i] * A * 1.6]);
   const vals = []; for (let i = 0; i < 180; i++) { let a = 0; for (let j = 0; j < 8; j++) a = Math.max(a, Math.abs(buf[z + i * 8 + j] || 0)); vals.push(a / S.pk); }
-  mirrorBars(W * 0.04, m, W * 0.92, H * 0.3, vals, grad(0, W, ["#2f7bff", "#ff2fb8", "#ffb31f"]), dpr);
-  glow(pts, "#ffffff", 1.2 + lv[0] * 6, dpr);
+  mirrorBars(W * 0.04, m, W * 0.92, H * 0.3, vals, grad(0, W, T.cols.slice(0, 3)), dpr);
+  glow(pts, T.ink, (T.glow ? 1.2 + lv[0] * 6 : 1.6), dpr);
 }
 function filtre(W, H, dpr) {                         /* the spectrum, and the filter of the editor's page over it */
   an.getFloatFrequencyData(fbuf);
-  const ny = ac.sampleRate / 2, base = H * 0.86, top = H * 0.12, nb = 160, cols = grad(0, W, ["#22e6ff", "#7b5cff", "#ff4fd8", "#ffb31f"]);
+  const ny = ac.sampleRate / 2, base = H * 0.86, top = H * 0.12, nb = 160, cols = grad(0, W, [T.cols[3], T.cols[0], T.cols[1], T.cols[2]]);
   g.fillStyle = cols;
   for (let i = 0; i < nb; i++) {
     const f0 = xf((i / nb) * W, W), f1 = xf(((i + 1) / nb) * W, W);
     let a = -140; for (let k = Math.floor(f0 / ny * 2048); k <= Math.min(2047, Math.ceil(f1 / ny * 2048)); k++) a = Math.max(a, fbuf[k]);
     const h = Math.max(0, (a + 100) / 85) * (base - top), x = (i / nb) * W;
-    g.globalAlpha = 0.25; g.shadowBlur = 16 * dpr; g.shadowColor = "#fff"; g.fillRect(x, base - h, W / nb * 0.9, h);
-    g.globalAlpha = 0.9; g.shadowBlur = 0; g.fillRect(x + W / nb * 0.15, base - h, W / nb * 0.55, h);
+    if (T.glow) { g.globalAlpha = 0.25 * T.glow; g.shadowBlur = 16 * dpr * T.glow; g.shadowColor = "#fff"; g.fillRect(x, base - h, W / nb * 0.9, h); }
+    g.globalAlpha = 0.9; g.shadowBlur = 0; g.fillRect(x + W / nb * (1 - T.bar) / 2, base - h, W / nb * T.bar, h);
   }
   g.globalAlpha = 1;
-  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { const x = fx(f, W); g.fillStyle = "#1a2550"; g.fillRect(x, top, dpr, base - top); label(f >= 1000 ? f / 1000 + "k" : String(f), x + 4 * dpr, base + 18 * dpr, "#5a73a0", dpr); }
+  for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { const x = fx(f, W); g.fillStyle = T.grid; g.fillRect(x, top, dpr, base - top); label(f >= 1000 ? f / 1000 + "k" : String(f), x + 4 * dpr, base + 18 * dpr, T.dim, dpr); }
   const p = filterPage();
   if (p) {                                           /* cutoff and resonance, 0..1 from the editor's knobs */
     const fc = 20 * 1000 ** (p.cut ?? 0.6), q = 0.5 + (p.res ?? 0.2) * 12, pts = [];
     for (let x = 0; x <= W; x += 3 * dpr) { const r = xf(x, W) / fc, mag = 1 / Math.sqrt((1 - r * r) ** 2 + (r / q) ** 2);
       pts.push([x, base - Math.max(0, Math.min(1.25, (20 * Math.log10(mag) + 48) / 64)) * (base - top)]); }
-    glow(pts, "#ffffff", 2.2, dpr);
+    glow(pts, T.ink, 2.2, dpr);
     label(`${p.title}  ${Math.round(fc)} Hz`, fx(fc, W) + 8 * dpr, top + 20 * dpr, "#ff9a1f", dpr, 15);
-  } else label("ouvre une page FILTER dans l'éditeur pour voir sa courbe ici", W * 0.04, top + 4 * dpr, "#5a73a0", dpr, 13);
+  } else label("ouvre une page FILTER dans l'éditeur pour voir sa courbe ici", W * 0.04, top + 4 * dpr, T.dim, dpr, 13);
 }
 function multiband(W, H, dpr, lv) {                  /* three bands: the spectrum coloured by band, crossovers to drag, a meter and a scope each */
   an.getFloatFrequencyData(fbuf);
@@ -199,13 +230,14 @@ function multiband(W, H, dpr, lv) {                  /* three bands: the spectru
   for (let i = 0; i < nb; i++) {
     const x = (i / nb) * W, f = xf(x, W), k = Math.min(2047, Math.round(f / ny * 2048)), band = f < S.x[0] ? 0 : f < S.x[1] ? 1 : 2;
     const h = Math.max(0, (fbuf[k] + 100) / 85) * (base - top);
-    g.fillStyle = BAND[band]; g.globalAlpha = 0.25; g.shadowBlur = 12 * dpr; g.shadowColor = BAND[band]; g.fillRect(x, base - h, W / nb, h);
-    g.globalAlpha = 0.85; g.shadowBlur = 0; g.fillRect(x + W / nb * 0.2, base - h, W / nb * 0.5, h);
+    g.fillStyle = BAND[band];
+    if (T.glow) { g.globalAlpha = 0.25 * T.glow; g.shadowBlur = 12 * dpr * T.glow; g.shadowColor = BAND[band]; g.fillRect(x, base - h, W / nb, h); }
+    g.globalAlpha = 0.85; g.shadowBlur = 0; g.fillRect(x + W / nb * (1 - T.bar) / 2, base - h, W / nb * T.bar, h);
   }
   g.globalAlpha = 1;
   S.x.forEach((f, i) => { const x = fx(f, W);                     /* the crossovers */
-    glow([[x, top - 10 * dpr], [x, base]], S.drag === i ? "#ff9a1f" : "#e8f0ff", 1.5, dpr);
-    label(f >= 1000 ? (f / 1000).toFixed(1) + "k" : Math.round(f) + "", x + 6 * dpr, top, "#e8f0ff", dpr, 13); });
+    glow([[x, top - 10 * dpr], [x, base]], S.drag === i ? "#ff9a1f" : T.ink, 1.5, dpr);
+    label(f >= 1000 ? (f / 1000).toFixed(1) + "k" : Math.round(f) + "", x + 6 * dpr, top, T.txt, dpr, 13); });
   const names = ["LOW", "MID", "HIGH"], cw = W / 3;
   bands.forEach((b, k) => {                                         /* each band: its scope and its meter */
     b.getFloatTimeDomainData(bb);
@@ -215,9 +247,11 @@ function multiband(W, H, dpr, lv) {                  /* three bands: the spectru
     for (let i = 0; i < 600; i++) pts.push([x0 + (i / 600) * w, y - bb[i * 2] / S.bpk[k] * A * 0.9]);
     glow(pts, BAND[k], 1.6, dpr);
     const lvl = Math.min(1, lv[k + 1] * 5), mx = x0 + w + cw * 0.06, mh = H * 0.3;
-    g.fillStyle = "#0a1230"; g.fillRect(mx, y - mh / 2, cw * 0.06, mh);
-    const q = g.createLinearGradient(0, y + mh / 2, 0, y - mh / 2); q.addColorStop(0, BAND[k]); q.addColorStop(1, "#ffffff");
-    g.fillStyle = q; g.shadowBlur = 14 * dpr; g.shadowColor = BAND[k]; g.fillRect(mx, y + mh / 2 - lvl * mh, cw * 0.06, lvl * mh); g.shadowBlur = 0;
+    g.fillStyle = T.meter; g.fillRect(mx, y - mh / 2, cw * 0.06, mh);
+    if (T.bevel) { g.fillStyle = "#000"; g.fillRect(mx, y - mh / 2, cw * 0.06, 2 * dpr); g.fillRect(mx, y - mh / 2, 2 * dpr, mh);
+      g.fillStyle = "#fff"; g.fillRect(mx, y + mh / 2 - 2 * dpr, cw * 0.06, 2 * dpr); g.fillRect(mx + cw * 0.06 - 2 * dpr, y - mh / 2, 2 * dpr, mh); }
+    const q = g.createLinearGradient(0, y + mh / 2, 0, y - mh / 2); q.addColorStop(0, BAND[k]); q.addColorStop(1, T.glow ? "#ffffff" : BAND[k]);
+    g.fillStyle = q; g.shadowBlur = 14 * dpr * T.glow; g.shadowColor = BAND[k]; g.fillRect(mx, y + mh / 2 - lvl * mh, cw * 0.06, lvl * mh); g.shadowBlur = 0;
     label(names[k], x0, y - A - 14 * dpr, BAND[k], dpr, 15);
   });
 }
@@ -225,6 +259,7 @@ function multiband(W, H, dpr, lv) {                  /* three bands: the spectru
 /* ---- controls */
 function setMode(m) { S.mode = m; localStorage.setItem("jmScopeMode", m); document.querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", +b.dataset.m === m)); }
 document.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => setMode(+b.dataset.m)));
+$("theme").addEventListener("click", () => setTheme(TK[(TK.indexOf(Object.keys(THEMES).find((k) => THEMES[k] === T)) + 1) % TK.length]));
 $("auto").addEventListener("click", () => { S.auto = !S.auto; S.autoT = performance.now(); $("auto").classList.toggle("on", S.auto); });
 $("fs").addEventListener("click", () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {}));
 $("src").addEventListener("change", () => useSource($("src").value));
@@ -232,6 +267,7 @@ addEventListener("keydown", (e) => {
   if (e.key >= "1" && e.key <= "4") setMode(+e.key - 1);
   else if (e.key === "a" || e.key === "A") $("auto").click();
   else if (e.key === "f" || e.key === "F") $("fs").click();
+  else if (e.key === "t" || e.key === "T") $("theme").click();
 });
 let idle; const wake = () => { document.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add("idle"), 2500); };
 addEventListener("mousemove", wake); wake();
@@ -251,7 +287,7 @@ cv.addEventListener("pointermove", (e) => {
 cv.addEventListener("pointerup", () => { S.drag = -1; });
 /* the editor's pages (ÉCRAN 2 in the editor): { type: "jm", pages: { title: { cut, res, ... } } } */
 addEventListener("message", (e) => { if (e.data && e.data.type === "jm") S.pages = e.data.pages || {}; });
-setMode(S.mode);
+setMode(S.mode); setTheme(Object.keys(THEMES).find((k) => THEMES[k] === T));
 listInputs().then(() => { if ($("src").value === "demo") $("msg").textContent = "clique pour démarrer"; });
 requestAnimationFrame(frame);
 </script>

@@ -118,6 +118,8 @@
           border-right: 1px solid var(--line); overflow-y: auto; }
   .brand { display: flex; align-items: flex-end; gap: 10px; color: var(--fg); text-decoration: none; }
   .brand svg { width: 132px; height: auto; display: block; }
+  .brand svg.jmcat { width: 48px; image-rendering: pixelated; }
+  .brand .jmname { font-size: 15px; letter-spacing: 1px; white-space: nowrap; color: var(--fg); padding-bottom: 2px; }
   .brand span { color: var(--dim); text-transform: lowercase; padding-bottom: 2px; }
   .tabs { display: flex; flex-direction: column; gap: 2px; }
   .tabs .navh { color: var(--s3); margin: 14px 0 4px 12px; text-transform: lowercase; }
@@ -925,6 +927,21 @@
   </main>
 </div>
 <script>
+/* Jean-Michel: the logo is the FM-1's intro cat (splash.c), its fur t*(42&t>>10) sliding through the colours */
+document.addEventListener("DOMContentLoaded", () => {
+  const b = document.querySelector(".brand"); if (!b) return;
+  const ART = ["..X..........X..", ".XXX........XXX.", ".XXXXXXXXXXXXXX.", ".XXXXXXXXXXXXXX.", "XXXooXXXXXXooXXX", "XXXooXXXXXXooXXX",
+    "XXXXXXXXXXXXXXXX", "XXXXXXXppXXXXXXX", ".XXXXXXppXXXXXX.", ".XXpXXXXXXXXpXX.", "..XXpppppppXXX..", "...XXXXXXXXXX..."];
+  const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg"), fur = [];
+  svg.setAttribute("viewBox", "0 0 16 12"); svg.setAttribute("shape-rendering", "crispEdges"); svg.setAttribute("aria-hidden", "true"); svg.classList.add("jmcat");
+  ART.forEach((row, y) => [...row].forEach((c, x) => { if (c === ".") return;
+    const r = document.createElementNS(NS, "rect"); r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1.02); r.setAttribute("height", 1.02);
+    r.setAttribute("fill", c === "o" ? "#fff" : c === "p" ? "#000" : "#888"); svg.append(r); if (c === "X") fur.push([r, 9000 + y * 256 + x * 16, y]); }));
+  const name = document.createElement("b"); name.className = "jmname"; name.textContent = "JEAN-MICHEL";
+  b.querySelector("svg")?.remove(); b.prepend(svg, name); b.setAttribute("aria-label", "Jean-Michel");
+  let f = 0; const paint = () => { for (const [r, t, y] of fur) r.setAttribute("fill", `hsl(${(((t * (42 & (t >> 10))) + y * 3 + f * 9) & 255) / 255 * 360} 85% 58%)`); f++; };
+  paint(); setInterval(paint, 120);
+});
 /* Jean-Michel: the skin (?skin=wb|fm1, else the last one chosen; FM-1 PAD and the Mac app open in wb) */
 (() => {
   const K = ["fm1", "wb", "petrole", "outremer"], q = new URLSearchParams(location.search).get("skin");
