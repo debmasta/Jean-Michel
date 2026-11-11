@@ -201,6 +201,39 @@
   .trkvol { display: flex; align-items: center; gap: 8px; flex: 0 1 260px; }
   .trkvol input { flex: 1; } .trkvol b { min-width: 3ch; text-align: right; }
   :root[data-skin="wb"] .trkhead { background: var(--wW); color: var(--wB); border-left-color: var(--wO); }
+  /* PANNEAU: tiles */
+  #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
+  #p-sound.pm #jmpages { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
+  #p-sound.pm .group, .fwin .group { margin: 0; padding: 8px 10px 6px; }
+  #p-sound.pm .group h2 { font-size: 18px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .group h2 .sub { margin-left: auto; }
+  .fbtn { display: none; margin-left: auto; width: 28px; height: 26px; padding: 0; font-size: 16px; line-height: 1; }
+  #p-sound.pm .fbtn, .fwin .fbtn { display: inline-block; } #p-sound.pm .group h2 .sub { display: none; }
+  #p-sound.pm .group h3 { display: none; }
+  #p-sound.pm .group .pg:not(.on) { display: none; }
+  .ptabs { display: none; gap: 3px; flex-wrap: wrap; margin: 0 0 5px; }
+  #p-sound.pm .ptabs { display: flex; } .fwin .ptabs { display: none; }
+  .ptabs button { padding: 2px 7px; font-size: 12px; min-height: 0; height: 22px; }
+  .ptabs button.on { background: var(--trk, #ff9a1f); color: #000; }
+  #p-sound.pm .wv { height: 58px; margin: 2px 0 4px; }
+  #p-sound.pm .knob { padding: 3px 6px 5px; gap: 2px; }
+  #p-sound.pm .knob .v { font-size: 20px; line-height: 22px; } #p-sound.pm .knob .v small { font-size: 11px; }
+  #p-sound.pm .knob.enum select { height: 26px; margin-top: 2px; font-size: 13px; }
+  #p-sound.pm .card > p.dim, #p-sound.pm #ctlhelp, #p-sound.pm .lyhelp, #p-sound.pm #lypanel > p.dim, #p-sound.pm #jmpanel > p.dim { display: none; }
+  #p-sound.pm #browser .acts .bar { display: inline-flex; margin: 0 6px 0 0; }
+  #p-sound.pm .card { padding-top: 8px; padding-bottom: 8px; }
+  #p-sound.pm #jmpages .group { background: var(--s2); }
+  #jmpages > .group { background: none; border: 0; padding: 0; margin: 0; } #jmpages > .group h2 { font-size: inherit; color: var(--t1); margin: 14px 0 0; }
+  #p-sound.pm #jmpages > .group { border: 1px solid var(--line); padding: 8px 10px 6px; } #p-sound.pm #jmpages > .group h2 { margin: 0 0 4px; }
+  .fwin { position: fixed; width: 560px; max-height: 88vh; overflow: auto; resize: both; background: var(--s1); border: 2px solid var(--trk, #ff9a1f);
+          box-shadow: 0 12px 40px #0009; }
+  .fwin .fbar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 10px;
+                background: var(--trk, #ff9a1f); color: #000; cursor: move; user-select: none; touch-action: none; }
+  .fwin .fbar button { width: 28px; height: 24px; padding: 0; }
+  .fwin .group { border: 0; } .fwin .group > h2 { display: none; } .fwin .group h3 { display: flex; }
+  .fwin .pg { display: block !important; }
+  :root[data-skin="wb"] .fwin { border-color: var(--wO); } :root[data-skin="wb"] .fwin .fbar { background: var(--wO); }
+  .trkhead #pmbtn { height: 36px; }
   .lypick { display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; }
   .lypick .kl { color: var(--t1); min-width: 44px; }
   .lypick select { flex: 1; min-width: 0; height: 38px; font-size: 18px; color: var(--t1); background-color: var(--s2); border: 1px solid var(--line); }
@@ -594,6 +627,7 @@
       <!-- Jean-Michel: the two synths as two blocks, each with its sound and its volume on top -->
       <div class="trkhead" id="t1head"><b class="trkn" id="t1name">SYNTH 1</b>
         <span class="trkpick" id="t1pick"><button type="button" id="t1prev" title="preset précédent">&lsaquo;</button><button type="button" id="t1next" title="preset suivant">&rsaquo;</button></span>
+        <button type="button" id="pmbtn" title="panneau de synthé / longue liste">LISTE</button>
         <label class="trkvol"><span>VOL</span><input type="range" id="t1vol" min="0" max="127" step="1"><b id="t1volv"></b></label></div>
       <div class="card">
         <div class="browser" id="browser">
@@ -5791,9 +5825,10 @@ function buildGroups() {
         const rows = ids.map((id) => paramRow(s, id, g.sys)).filter(Boolean);
         if (!rows.length) continue;
         const tt = g.engine && (dev.titles[dev.dump.engine] || [])[g.pages.findIndex((x) => x[0] === title)];
-        if (g.pages.length > 1) div.append(el("h3", { ic: PAGE_IC[tt || title], text: tt || title }));
-        const kr = el("div", { class: "knobs" }, ...rows);
-        div.append(...wvAttach(title, kr), kr);
+        const kr = el("div", { class: "knobs" }, ...rows), pgd = el("div", { class: "pg", "data-t": tt || title });
+        if (g.pages.length > 1) pgd.append(el("h3", { ic: PAGE_IC[tt || title], text: tt || title }));
+        pgd.append(...wvAttach(title, kr), kr);
+        div.append(pgd);
         pages++;
       }
       if (pages > 1) div.firstChild.append(el("span", { class: "sub", text: `${pages} ${lang === "ja" ? "ページ" : "pages"}` }));
@@ -10348,7 +10383,7 @@ async function jmProbe() {
       JM.ctl.set(id, { d, input, out });
       row.append(el("div", { class: "knob" + (sel ? " enum" : "") }, el("span", { class: "kl", text: d.label }), out, input));
     }
-    box.append(el("h3", { text: pg.title }), ...wvAttach(pg.title, row), row);
+    box.append(el("div", { class: "group jmg" }, el("h2", { text: pg.title }), el("div", { class: "pg", "data-t": pg.title }, ...wvAttach(pg.title, row), row)));
   }
   JM.pages = pages;
   $("jmpanel").hidden = false;
@@ -10463,11 +10498,59 @@ setInterval(jmPoll, 700);
     if (y && performance.now() - t2 > 800 && document.activeElement !== $("t2vol")) { $("t2vol").value = String(y.p[0]); $("t2volv").textContent = String(y.p[0]); }
   }, 250);
 })();
+/* ---- PANNEAU (Jean-Michel): the sound as a synth's front: a tile per button (ENV, LFO, FX ...) with its pages as tabs,
+   a little screen each, compact knobs; ⤢ takes a tile out into a floating window (drag it by its title, resize its corner) */
+const PM = { on: (localStorage.getItem("jmView") || "pm") === "pm", z: 50 };
+function pmApply() {
+  $("p-sound").classList.toggle("pm", PM.on);
+  $("pmbtn").textContent = PM.on ? "LISTE" : "PANNEAU";
+  for (const gdiv of document.querySelectorAll("#groups > .group, #jmpages > .group")) {
+    const h2 = gdiv.querySelector(":scope > h2");
+    if (!h2 || gdiv.dataset.pm) continue;
+    gdiv.dataset.pm = "1";
+    const pgs = [...gdiv.querySelectorAll(":scope > .pg")];
+    if (pgs.length > 1) {
+      const tabs = el("div", { class: "ptabs" }, ...pgs.map((pg, i) => { const b = el("button", { type: "button", text: pg.dataset.t });
+        b.addEventListener("click", () => { pgs.forEach((x, j) => x.classList.toggle("on", j === i)); [...tabs.children].forEach((x, j) => x.classList.toggle("on", j === i)); });
+        return b; }));
+      h2.after(tabs); tabs.firstChild.classList.add("on");
+    }
+    pgs[0] && pgs[0].classList.add("on");
+    const fb = el("button", { type: "button", class: "fbtn", title: "fenêtre flottante", text: "⤢" });
+    fb.addEventListener("click", (e) => { e.stopPropagation(); pmFloat(gdiv); });
+    h2.append(fb);
+  }
+}
+function pmFloat(gdiv) {
+  if (gdiv.closest(".fwin")) { pmDock(gdiv.closest(".fwin")); return; }
+  const ph = document.createComment("pm"), r = gdiv.getBoundingClientRect();
+  gdiv.before(ph);
+  const bar = el("div", { class: "fbar" }, el("b", { text: gdiv.querySelector("h2").textContent.replace("⤢", "").trim() }), el("button", { type: "button", text: "✕" }));
+  const win = el("div", { class: "fwin" }, bar, gdiv);
+  win.ph = ph;
+  const n = document.querySelectorAll(".fwin").length;
+  Object.assign(win.style, { left: Math.min(innerWidth - 420, r.left + 40 + n * 24) + "px", top: Math.max(10, 70 + n * 24) + "px", zIndex: ++PM.z });
+  document.body.append(win);
+  bar.lastChild.addEventListener("click", () => pmDock(win));
+  win.addEventListener("pointerdown", () => { win.style.zIndex = ++PM.z; });
+  bar.addEventListener("pointerdown", (e) => {
+    if (e.target.tagName === "BUTTON") return;
+    const x0 = e.clientX - win.offsetLeft, y0 = e.clientY - win.offsetTop; bar.setPointerCapture(e.pointerId);
+    const mv = (ev) => { win.style.left = Math.max(0, Math.min(innerWidth - 80, ev.clientX - x0)) + "px"; win.style.top = Math.max(0, Math.min(innerHeight - 30, ev.clientY - y0)) + "px"; };
+    bar.addEventListener("pointermove", mv); bar.addEventListener("pointerup", () => bar.removeEventListener("pointermove", mv), { once: true });
+  });
+}
+function pmDock(win) { const g = win.querySelector(".group"); if (win.ph.isConnected) win.ph.replaceWith(g); win.remove(); }
+$("pmbtn").addEventListener("click", () => { PM.on = !PM.on; localStorage.setItem("jmView", PM.on ? "pm" : "list"); pmApply(); });
+new MutationObserver(() => { for (const w of document.querySelectorAll(".fwin")) if (!w.ph.isConnected) w.remove(); pmApply(); })
+  .observe($("groups"), { childList: true });
+new MutationObserver(() => pmApply()).observe($("jmpages"), { childList: true });
+pmApply();
 /* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
 const WV = { all: new Set(), t0: performance.now(), raf: 0 };
 const WV_KIND = (t) => /^(LAYER )?FX$/.test(t) ? "sends" : /INS|DRIVE|DIST|CRUSH/.test(t) ? "shape"
   : /FILT|EQ/.test(t) ? "filter" : /^DLY/.test(t) ? "delay" : /REV/.test(t) ? "reverb" : /CHO|SPICE/.test(t) ? "chorus"
-  : /^LFO(?! DEST)/.test(t) ? "lfo" : /^ENV(?! DEST| 2 LOOP)/.test(t) ? "env" : /RHYTHM|VOICE [45]|BYTE MEM/.test(t) ? "bars" : null;
+  : /^LFO(?! DEST)/.test(t) ? "lfo" : /^ENV(?! DEST| 2 LOOP)/.test(t) ? "env" : /RHYTHM|VOICE [45]|BYTE MEM/.test(t) ? "bars" : "lcd";
 function wvAttach(title, row) {
   const kind = WV_KIND(String(title).toUpperCase());
   if (!kind) return [];
@@ -10603,6 +10686,18 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
     wvStroke(g, pts, grad, 2, dpr);
     const px = ((t * 0.3) % 1) * W; g.fillStyle = "#ece6da"; g.shadowBlur = 3 * dpr; g.shadowColor = cols[1];
     g.beginPath(); g.arc(px, m - f(px / W) * A, 3 * dpr, 0, 7); g.fill(); g.shadowBlur = 0;
+  } else if (kind === "lcd") {                      /* any other page: a little FM-1 screen, its four values as bars */
+    g.fillStyle = "#050505"; g.fillRect(0, 0, W, H);
+    const C = ["#ff9a1f", "#5fd35f", "#ffd21f", "#4fc3ff"], ks = Object.keys(v.txt), n = Math.max(1, ks.length), cw = W / 4;
+    g.font = `${Math.round(H * 0.21)}px ${WV.font || (WV.font = getComputedStyle(document.body).fontFamily)}`;
+    ks.slice(0, 4).forEach((k, i) => {
+      const x = i * cw + 6 * dpr, w = cw - 12 * dpr, a = v.list[i] || 0;
+      g.fillStyle = C[i]; g.fillText(k.slice(0, 6), x, H * 0.24);
+      g.fillStyle = "#e8e8e8"; g.fillText(String(v.txt[k]).slice(0, 8), x, H * 0.52);
+      g.fillStyle = "#1c1c1c"; g.fillRect(x, H * 0.68, w, H * 0.16);
+      g.fillStyle = C[i]; g.fillRect(x, H * 0.68, Math.max(2 * dpr, w * a), H * 0.16);
+    });
+    if (n < 1) return;
   } else {                                          /* rhythm / voice: an equalizer of pulses, its pattern from the knobs */
     const s = v.list.reduce((p, x, i) => p + x * (i + 1), 0), n = 32, beat = Math.floor(t * 4);
     g.fillStyle = grad;
