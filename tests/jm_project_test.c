@@ -46,6 +46,19 @@ int main(void)
         ed_handle(f, 7);
         chk(layer_pos(&tot) == before + 5u, "JM_SET: the layer's sound changes");
         printf("  layer sound now: %s\n", (const char *)&ed_out[8]);
+        {   /* JM_SOUNDS: the list by name, the same name the layer shows */
+            char nm[16]; uint32_t q, k, n, from = before + 5u;
+            strncpy(nm, (const char *)&ed_out[8], 15); nm[15] = 0;
+            f[3] = 105; f[4] = 0; f[5] = 0; ed_handle(f, 6);
+            chk(ed_out[4] == 105u && ed_out[9] == 24u && !strcmp((const char *)&ed_out[10], "BASS"), "JM_SOUNDS: 24 from the first, BASS");
+            chk((uint32_t)(ed_out[5] | ed_out[6] << 7) - 8192u == tot, "JM_SOUNDS: the total");
+            f[4] = (uint8_t)(from & 127u); f[5] = (uint8_t)(from >> 7); ed_handle(f, 6);
+            n = ed_out[9]; q = 10; q += (uint32_t)strlen((const char *)&ed_out[q]) + 1u;
+            chk(n >= 1u && !strcmp((const char *)&ed_out[q], nm), "JM_SOUNDS: the name of the layer's sound");
+            f[4] = (uint8_t)(tot & 127u); f[5] = (uint8_t)(tot >> 7); ed_handle(f, 6);
+            chk(ed_out[9] == 0u, "JM_SOUNDS: past the end, none");
+            (void)k;
+        }
         f[3] = 104; f[4] = 1; f[5] = TW_POLY; ed_handle(f, 6);
         chk(tw_is(TW_POLY), "JM_FX: POLY on");
         f[4] = 2; ed_handle(f, 6);

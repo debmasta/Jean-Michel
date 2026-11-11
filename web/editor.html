@@ -189,6 +189,10 @@
   .jmfx { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 8px 0 14px; }
   .jmfx button { padding: 10px 4px; background: var(--s2, #111); color: inherit; border: 1px solid var(--line); cursor: pointer; }
   .jmfx button.on { background: var(--t1); color: #000; border-color: var(--t1); }
+  .lypick { display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; }
+  .lypick .kl { color: var(--t1); min-width: 44px; }
+  .lypick select { flex: 1; min-width: 0; height: 38px; font-size: 18px; color: var(--t1); background-color: var(--s2); border: 1px solid var(--line); }
+  .lypick button { width: 38px; height: 38px; font-size: 22px; line-height: 1; padding: 0; }
   #jmpages h3 { margin: 14px 0 0; font-size: inherit; color: var(--t1); }
   .knob { --c: var(--t1); position: relative; padding: 8px 10px 10px; min-width: 0; border-left: 1px solid var(--line);
           display: flex; flex-direction: column; gap: 4px; }
@@ -648,6 +652,8 @@
         <h2 data-t="lyTitle" data-ic="symbol_keyboard"></h2>
         <p class="dim" data-t="lyHelp"></p>
         <p class="dim" id="lysound"></p>
+        <div class="lypick" id="lypick" hidden><span class="kl">SON</span>
+          <button type="button" id="lyprev" title="son précédent">&lsaquo;</button><select id="lysel"></select><button type="button" id="lynext" title="son suivant">&rsaquo;</button></div>
         <div class="knobs" id="lybody"></div>
       </div>
       <!-- Jean-Michel: the FX window and the device's own pages (layer sound, VOICE 4/5, RHYTHM, BYTE MEM, LAYER FX/INS); hidden on other firmware -->
@@ -3383,7 +3389,7 @@ function makeMockDevice(opt = {}) {
         b(st.smp.length); b(SMP.SLOT_SIZE / 1024);
         st.smp.forEach((u) => { b(u.zones); s(u.zones ? u.name : ""); b(u.zones ? Math.ceil(u.len / 1024) : 0); });
         break;
-      case 100: case 101: case 102: case 103: case 104: {   /* Jean-Michel (?mock=1&jm=1): a few of its pages, the FX window */
+      case 100: case 101: case 102: case 103: case 104: case 105: {   /* Jean-Michel (?mock=1&jm=1): a few of its pages, the FX window */
         if (!/[?&]jm=1/.test(location.search)) return null;
         const J = st.jm = st.jm || { v: { 1: 12, 4: 2, 65: 0, 66: 0, 72: 2, 73: 2, 74: 0 }, fx: 0,
           d: { 1: ["SOUND", 0, 0, 200, []], 4: ["OCT", 8, 0, 4, ["-2", "-1", "0", "+1", "+2"]], 65: ["FLAM", 3, 0, 127, []], 66: ["STACK", 8, 0, 3, ["OFF", "OCT", "5TH", "OCT+5"]],
@@ -3392,6 +3398,8 @@ function makeMockDevice(opt = {}) {
           "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly", "CHAOS", "remix", "grab", "break"];
         if (cmd === 100) { b(3); s("LAYER"); [1, 4, 127, 127].forEach(b); s("VOICE 4"); [65, 66, 127, 127].forEach(b); s("RHYTHM 2"); [72, 73, 74, 127].forEach(b); }
         else if (cmd === 101) { const d = J.d[a[0]]; if (!d) return null; b(a[0]); b(d[1]); v(d[2]); v(d[3]); v(d[2]); s(d[0]); s(""); d[4].forEach(s); }
+        else if (cmd === 105) { const K = ["BASS", "KEYS", "LEAD", "PUNK", "USER"], f = a[0] | a[1] << 7, n = Math.max(0, Math.min(24, 201 - f));
+          v(201); v(f); b(n); for (let i = f; i < f + n; i++) { s(K[Math.floor(i / 41)]); s(K[Math.floor(i / 41)] + " " + i); } }
         else if (cmd === 104) { if (a[0] === 1) J.fx |= 1 << a[1]; else if (a[0] === 2) J.fx &= ~(1 << a[1]); if (a[0] === 1 && a[1] === 14) J.fx = 0; b(LAB.length); LAB.forEach((l, i) => { b((J.fx >> i) & 1); s(l); }); }
         else {
           const d = J.d[a[0]]; if (!d) return null;
@@ -10287,6 +10295,7 @@ async function jmProbe() {
   for (const pg of pages) {
     const row = el("div", { class: "knobs" });
     for (const id of pg.ids) {
+      if (id === 1) continue;                         /* (the layer's sound: in the LAYER card, before OCT, as a list) */
       let d;
       try {
         const q = new Reader(await rq([101, [id]], { timeout: 400 }));
@@ -10305,7 +10314,38 @@ async function jmProbe() {
   }
   JM.pages = pages;
   $("jmpanel").hidden = false;
+  await jmSounds();
 }
+/* the layer's sound by name (JM_SOUNDS 105: the FM-1's preset list, factory by kind then the user's), in the LAYER card */
+const JMS = { n: 0, t: 0 };
+async function jmSounds() {
+  const list = [];
+  try {
+    for (let from = 0, tot = 1; from < tot;) {
+      const r = new Reader(await rq([105, [from & 127, from >> 7]], { timeout: 400 }));
+      tot = r.v(); r.v(); const n = r.b(); if (!n) break;
+      for (let i = 0; i < n; i++) list.push({ kind: r.s(), name: r.s() });
+      from += n;
+    }
+  } catch (e) { $("lypick").hidden = true; JMS.n = 0; return; }
+  const KIND = { BASS: "BASS", KEYS: "KEYS", ORGN: "ORGUE", PAD: "PAD", LEAD: "LEAD", PLCK: "PLUCK", STAB: "STAB", FX: "FX", PUNK: "PUNK", USER: "MES SONS" };
+  const sel = $("lysel"); sel.replaceChildren();
+  let g = null, k = null;
+  list.forEach((x, i) => {
+    if (x.kind !== k) { k = x.kind; g = el("optgroup", { label: KIND[k] || k }); sel.append(g); }
+    g.append(el("option", { value: i, text: x.name }));
+  });
+  JMS.n = list.length;
+  $("lypick").hidden = !list.length;
+}
+async function jmSound(v) {
+  if (!JMS.n) return;
+  v = (v + JMS.n) % JMS.n; $("lysel").value = String(v); JMS.t = performance.now();
+  try { await rq([103, [1, ...v14enc(v)]], { key: "jm1" }); } catch (e) {}
+}
+$("lysel").addEventListener("change", () => jmSound(+$("lysel").value));
+$("lyprev").addEventListener("click", () => jmSound(+$("lysel").value - 1));
+$("lynext").addEventListener("click", () => jmSound(+$("lysel").value + 1));
 function jmShow(id, a) {
   const c = JM.ctl.get(id); if (!c) return;
   const r = new Reader(a); r.b(); const v = r.v(), txt = r.s(), unit = r.i < a.length ? r.s() : "";
@@ -10349,6 +10389,11 @@ async function jmPoll() {
     if (!JM.pages) return;
     jmFx(await rq([104, [0, 0]], { key: "jmfx" }));
     for (const id of JM.ctl.keys()) jmShow(id, await rq([102, [id]], { key: "jmg" + id }));
+    if (JMS.n) {                                      /* the layer's sound, as the FM-1 has it (a new user sound: the list again) */
+      const r = new Reader(await rq([102, [1]], { key: "jmg1" })); r.b(); const v = r.v();
+      if (v >= JMS.n) await jmSounds();
+      else if (document.activeElement !== $("lysel") && performance.now() - JMS.t > 800) $("lysel").value = String(v);
+    }
   } catch (e) {
   } finally { JM.polling = false; }
 }

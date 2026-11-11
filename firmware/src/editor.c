@@ -927,7 +927,10 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
         ed_v(*xp);
         if (a[0] == X_LYSOUND) {
             uint32_t tot, c = layer_pos(&tot);
-            ed_str(c < NBANK ? BANK[c].name : "USER", 15);
+            char un[13];
+            if (c >= NBANK)
+                up_name(up_nth(c - NBANK), un);
+            ed_str(c < NBANK ? BANK[c].name : un, 15);
         } else {
             param_format(x, *xp, val, &unit);
             ed_str(val, 8);
@@ -963,6 +966,25 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
         for (i = 0; i < TW_N; i++) {
             ed_b(i == TW_CATS ? fl_on : i == TW_GRAB ? grb_st != 0 : (uint32_t)tw_is(i));
             ed_str(TW_LAB[i], 8);
+        }
+        break;
+    }
+    case 105: {                                            /* JM_SOUNDS from (v14): total, from, n, then kind, name per sound */
+        uint32_t tot = NBANK + up_count(), from = na >= 2u ? (uint32_t)(a[0] | (uint32_t)a[1] << 7) : 0u, n;
+        char un[13];
+        if (!bank_ready)
+            bank_resolve();
+        if (from > tot)
+            from = tot;
+        n = tot - from < 24u ? tot - from : 24u;
+        ed_v((int32_t)tot);
+        ed_v((int32_t)from);
+        ed_b(n);
+        for (i = from; i < from + n; i++) {
+            ed_str(base_kind(i), 4);
+            if (i >= NBANK)
+                up_name(up_nth(i - NBANK), un);
+            ed_str(i < NBANK ? BANK[i].name : un, 15);
         }
         break;
     }
