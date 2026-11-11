@@ -293,6 +293,33 @@
   #p-sound[data-syn="1"] .s2box, #p-sound[data-syn="2"] .s1box { display: none; }
   .s2box #lypanel > h2, #lypanel > p.dim[data-t="lyHelp"] { display: none; }
   .jmbox { margin-top: 10px; } #jmpages { display: none; }
+  /* DUO: SYNTH 1 and SYNTH 2 face to face, a screen each with its knobs, the buttons in the middle (the FM-1 remixed) */
+  #p-sound.duo { display: flex; flex-direction: column; }
+  #p-sound.duo .heads { order: 1; } #p-sound.duo .duo { order: 2; } #p-sound.duo #jmpanel { order: 3; } #p-sound.duo > *:not(.heads):not(.duo):not(#jmpanel) { order: 4; }
+  #p-sound.duo .s1box, #p-sound.duo .s2box { display: none !important; }
+  #p-sound.duo .heads .trkhead { opacity: 1; box-shadow: none; cursor: default; }
+  #p-sound.duo #jmpanel > h2, #p-sound.duo #jmpanel > p.dim { display: none; } #p-sound.duo #jmpanel { padding-top: 8px; }
+  .duo { display: grid; grid-template-columns: 1fr 230px 1fr; gap: 16px; margin: 4px 0 12px; align-items: start; }
+  .duo[hidden] { display: none; } .duo > * { min-width: 0; } .dscr canvas { width: 100%; }
+  #p-sound.duo #jmpanel { align-self: stretch; }
+  .duo.big1 { grid-template-columns: 2.2fr 200px .8fr; } .duo.big2 { grid-template-columns: .8fr 200px 2.2fr; }
+  .dpager { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; } .dpager b { flex: 1; text-align: center; letter-spacing: 3px; }
+  .dpager button { width: 36px; height: 30px; padding: 0; font-size: 22px; }
+  .dscr .wv { height: 300px !important; cursor: ns-resize; touch-action: none; }
+  .duo .dside.sel .dscr { box-shadow: 0 0 0 3px var(--wO, #ff9a1f), 0 3px 8px #0008; }
+  .dknobs { display: flex; justify-content: space-around; margin-top: 14px; }
+  .rk { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: ns-resize; touch-action: none; user-select: none; min-width: 70px; }
+  .rk .cap { width: 60px; height: 60px; border-radius: 50%; position: relative; background: radial-gradient(circle at 38% 32%, #3c3f47, #121318 70%);
+    box-shadow: 0 0 0 3px #000814, 0 0 0 5px #5A73A0, 0 5px 8px #0009; }
+  .rk .cap::before { content: ""; position: absolute; left: 50%; top: 5px; width: 4px; height: 17px; margin-left: -2px; background: var(--c, #fff); border-radius: 2px;
+    transform-origin: 2px 25px; transform: rotate(calc(-135deg + var(--p, 0) * 270deg)); }
+  .rk .cap::after { content: ""; position: absolute; inset: -11px; border-radius: 50%;
+    background: conic-gradient(from 225deg, var(--c, #fff) 0 calc(var(--p, 0) * 270deg), #ffffff18 0 270deg, #0000 0);
+    -webkit-mask: radial-gradient(circle, #0000 37px, #000 38px 42px, #0000 43px); mask: radial-gradient(circle, #0000 37px, #000 38px 42px, #0000 43px); }
+  .rk .kl { color: var(--c); letter-spacing: 1px; } .rk .kv { color: var(--fg, #e8f0ff); }
+  .dcats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 36px; } .dcats button { height: 44px; letter-spacing: 2px; position: relative; }
+  .dcats button.on { background: var(--wO, #ff9a1f); color: #000; }
+  .dmid .lab { margin-top: 14px; text-align: center; color: var(--dim); }
   /* PANNEAU: tiles */
   #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
   #p-sound.pm .jmbox { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
@@ -830,6 +857,13 @@
           <input type="file" id="hyfile" accept=".json,application/json" hidden>
           <label><span data-t="name"></span> <input type="text" id="hyname" maxlength="10" size="11"></label></p>
         <div id="hybody"></div>
+      </div>
+      <div class="duo" id="duo" hidden>
+        <div class="dside" id="d1"><div class="dpager"><button type="button" class="dprev">&lsaquo;</button><b class="dpt"></b><button type="button" class="dnext">&rsaquo;</button></div>
+          <div class="scr dscr"><canvas class="wv dwv"></canvas></div><div class="dknobs"></div></div>
+        <div class="dmid"><div class="dcats" id="dcats"></div><div class="lab">nom de page : clic = agrandir</div></div>
+        <div class="dside" id="d2"><div class="dpager"><button type="button" class="dprev">&lsaquo;</button><b class="dpt"></b><button type="button" class="dnext">&rsaquo;</button></div>
+          <div class="scr dscr"><canvas class="wv dwv"></canvas></div><div class="dknobs"></div></div>
       </div>
       <div class="trkhead" id="t2head" hidden><b class="trkn">SYNTH 2 · LAYER</b>
         <span class="trkpick" id="t2pick"></span>
@@ -10611,10 +10645,12 @@ setInterval(jmPoll, 700);
 })();
 /* ---- PANNEAU (Jean-Michel): the sound as a synth's front: a tile per button (ENV, LFO, FX ...) with its pages as tabs,
    a little screen each, compact knobs; ⤢ takes a tile out into a floating window (drag it by its title, resize its corner) */
-const PM = { on: (localStorage.getItem("jmView") || "pm") === "pm", z: 50 };
+const PM = { view: localStorage.getItem("jmView") || "duo", z: 50, get on() { return this.view !== "list"; } };
 function pmApply() {
   $("p-sound").classList.toggle("pm", PM.on);
-  $("pmbtn").textContent = PM.on ? "LISTE" : "PANNEAU";
+  $("p-sound").classList.toggle("duo", PM.view === "duo");
+  $("pmbtn").textContent = { duo: "DUO", pm: "PANNEAU", list: "LISTE" }[PM.view];
+  if ($("duo")) $("duo").hidden = PM.view !== "duo";
   for (const gdiv of document.querySelectorAll("#groups > .group, .jmbox > .group")) {
     const h2 = gdiv.querySelector(":scope > h2");
     if (!h2 || gdiv.dataset.pm) continue;
@@ -10656,7 +10692,7 @@ $("titlebtn").addEventListener("click", () => { const L = ["plaque", "index", "o
   r.dataset.title = L[(L.indexOf(r.dataset.title) + 1) % L.length]; localStorage.setItem("jmTitle", r.dataset.title); });
 $("lookbtn").addEventListener("click", () => { const L = ["verre", "crt", "machine"], r = document.documentElement;
   r.dataset.look = L[(L.indexOf(r.dataset.look) + 1) % L.length]; localStorage.setItem("jmLook", r.dataset.look); });
-$("pmbtn").addEventListener("click", () => { PM.on = !PM.on; localStorage.setItem("jmView", PM.on ? "pm" : "list"); pmApply(); });
+$("pmbtn").addEventListener("click", () => { PM.view = { duo: "pm", pm: "list", list: "duo" }[PM.view] || "duo"; localStorage.setItem("jmView", PM.view); pmApply(); });
 new MutationObserver(() => { for (const w of document.querySelectorAll(".fwin")) if (!w.ph.isConnected) w.remove(); pmApply(); })
   .observe($("groups"), { childList: true });
 new MutationObserver(() => pmApply()).observe($("jmpages"), { childList: true });
@@ -10749,6 +10785,80 @@ function cbDraw(now) {
     pmApply();
   }).observe($("jmpages"), { childList: true });
 })();
+/* ---- DUO (Jean-Michel): the FM-1 remixed big. Synth 1: the categories (ENV, LFO, EDIT ...) in the middle, its pages with ‹ ›;
+   synth 2: the layer's pages (LAYER, LAYER FX, LAYER INS ...). Each screen draws its page and is its knobs; the knobs below turn */
+const DUO = { cat: 0, pg: [0, 0], side: 1, t: 0 };
+function duoPages(n) {
+  const nm = (h) => [...h.childNodes].filter((x) => x.nodeType === 3 || (x.tagName && !/BUTTON|SPAN/.test(x.tagName))).map((x) => x.textContent).join("").trim();
+  if (n === 1) return [...document.querySelectorAll("#groups > .group")].map((g) => ({ name: nm(g.querySelector("h2")),
+    pages: [...g.querySelectorAll(":scope > .pg")].map((p) => ({ title: p.dataset.t || "", row: p.querySelector(".knobs") })).filter((p) => p.row) })).filter((c) => c.pages.length);
+  const pages = [];
+  if ($("lybody") && $("lybody").children.length && !$("lypanel").hidden) pages.push({ title: "LAYER", row: $("lybody") });
+  for (const p of document.querySelectorAll("#jm2 .pg")) if (p.querySelector(".knobs")) pages.push({ title: p.dataset.t || "", row: p.querySelector(".knobs") });
+  return [{ name: "LAYER", pages }];
+}
+let duoW = null;
+const duoMk = () => [1, 2].map((n) => { const c = document.querySelector(`#d${n} .dwv`), w = { c, row: el("div"), kind: "lcd", title: "", seed: n * 3, hot: -1, duo: n }; WV.all.add(w); wvTouch(w); return w; });
+function duoKnob(input, c) {
+  const k = el("div", { class: "rk", style: `--c:${c}` }, el("div", { class: "cap" }), el("span", { class: "kl" }), el("span", { class: "kv" }));
+  k.input = input;
+  k.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); k.setPointerCapture(e.pointerId);
+    const i = k.input, y0 = e.clientY, v0 = i.tagName === "SELECT" ? i.selectedIndex : +i.value; let moved = false;
+    const mv = (ev) => { const dy = y0 - ev.clientY; if (Math.abs(dy) > 2) moved = true;
+      if (i.tagName === "SELECT") { const n = Math.max(0, Math.min(i.options.length - 1, v0 + Math.round(dy / 18))); if (n !== i.selectedIndex) { i.selectedIndex = n; i.dispatchEvent(new Event("change")); } }
+      else { const mn = +i.min, mx = +i.max, n = Math.max(mn, Math.min(mx, Math.round(v0 + dy * (mx - mn) / (ev.shiftKey ? 600 : 160)))); if (n !== +i.value) { i.value = String(n); i.dispatchEvent(new Event("input")); } } };
+    k.addEventListener("pointermove", mv);
+    k.addEventListener("pointerup", () => { k.removeEventListener("pointermove", mv);
+      if (i.tagName === "SELECT") { if (!moved) { i.selectedIndex = (i.selectedIndex + 1) % i.options.length; i.dispatchEvent(new Event("change")); } } else i.dispatchEvent(new Event("change")); }, { once: true });
+  });
+  k.addEventListener("dblclick", () => k.input.dispatchEvent(new Event("dblclick")));
+  return k;
+}
+function duoShow() {
+  if (PM.view !== "duo" || !$("duo")) return;
+  if (!duoW) duoW = duoMk();
+  const KC = ["#ff9a1f", "#5fd35f", "#ffd21f", "#4fc3ff", "#e8f0ff"];
+  const c1 = duoPages(1);
+  /* the middle: synth 1's categories */
+  const names = c1.map((c) => c.name).join("|");
+  if ($("dcats").dataset.n !== names) {
+    $("dcats").dataset.n = names;
+    $("dcats").replaceChildren(...c1.map((c, i) => { const b = el("button", { type: "button", text: c.name.replace(/^EDIT /, "") });
+      b.addEventListener("click", () => { DUO.cat = i; DUO.pg[0] = 0; DUO.side = 1; duoShow(); }); return b; }));
+  }
+  DUO.cat = Math.min(DUO.cat, Math.max(0, c1.length - 1));
+  [...$("dcats").children].forEach((b, i) => b.classList.toggle("on", i === DUO.cat));
+  const lists = [c1[DUO.cat] ? c1[DUO.cat].pages : [], duoPages(2)[0].pages];
+  $("d2").hidden = !lists[1].length; $("t2head").hidden = $("t2head").hidden;
+  lists.forEach((pages, s) => {
+    const side = $(`d${s + 1}`), w = duoW[s];
+    DUO.pg[s] = pages.length ? (DUO.pg[s] + pages.length) % pages.length : 0;
+    const pg = pages[DUO.pg[s]];
+    side.classList.toggle("sel", DUO.side === s + 1);
+    side.querySelector(".dpt").textContent = pg ? `${pg.title}  ${DUO.pg[s] + 1}/${pages.length}` : "";
+    if (!pg) return;
+    if (w.row !== pg.row) {
+      w.row = pg.row; w.title = pg.title.toUpperCase(); w.kind = WV_KIND(w.title);
+      const ins = [...pg.row.querySelectorAll(".knob")].map((k) => k.querySelector("input,select")).filter(Boolean).slice(0, 5);
+      side.querySelector(".dknobs").replaceChildren(...ins.map((i, k) => duoKnob(i, KC[k])));
+    }
+    for (const k of side.querySelectorAll(".rk")) {               /* the knobs show their input */
+      const i = k.input, kn = i.closest(".knob"), lab = (kn.querySelector(".kl") || {}).textContent || "";
+      const p = i.tagName === "SELECT" ? (i.options.length > 1 ? i.selectedIndex / (i.options.length - 1) : 0) : (+i.value - +i.min) / Math.max(1, +i.max - +i.min);
+      k.style.setProperty("--p", p.toFixed(3)); k.children[1].textContent = lab;
+      k.children[2].textContent = i.tagName === "SELECT" ? ((i.selectedOptions[0] || {}).textContent || "") : ((kn.querySelector(".v") || {}).textContent || i.value);
+    }
+  });
+}
+for (const n of [1, 2]) {
+  const side = $(`d${n}`);
+  side.querySelector(".dprev").addEventListener("click", () => { DUO.pg[n - 1]--; DUO.side = n; duoShow(); });
+  side.querySelector(".dnext").addEventListener("click", () => { DUO.pg[n - 1]++; DUO.side = n; duoShow(); });
+  side.querySelector(".dscr").addEventListener("click", (e) => { if (e.detail > 1) return; DUO.side = n; });
+  side.querySelector(".dpt").addEventListener("click", () => { const d = $("duo"), b = "big" + n; const on = !d.classList.contains(b); d.classList.remove("big1", "big2"); if (on) d.classList.add(b); });
+}
+setInterval(duoShow, 120);
 /* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
 const WV = { all: new Set(), t0: performance.now(), raf: 0 };
 const WV_KIND = (t) => /^(LAYER )?FX$/.test(t) ? "sends" : /INS|DRIVE|DIST|CRUSH/.test(t) ? "shape"
@@ -10783,7 +10893,7 @@ function wvTouch(w) {
   c.addEventListener("pointermove", (e) => { if (PM.on) w.hot = col(e); });
   c.addEventListener("pointerleave", () => { if (!w.drag) w.hot = -1; });
   c.addEventListener("pointerdown", (e) => {
-    if (!PM.on && !c.closest(".fwin")) return;
+    if (!PM.on && !c.closest(".fwin") && !w.duo) return;
     const k = knobs()[col(e)]; if (!k) return;
     const i = k.querySelector("input,select"); e.preventDefault(); c.setPointerCapture(e.pointerId);
     const y0 = e.clientY, v0 = i.tagName === "SELECT" ? i.selectedIndex : +i.value; let moved = false;
@@ -10834,7 +10944,7 @@ function wvFrame(now) {
     if (w.c.width !== W || w.c.height !== H) { w.c.width = W; w.c.height = H; }
     const g = w.c.getContext("2d"), vv = wvVals(w.row), pm = PM.on || !!w.c.closest(".fwin");
     wvDraw(g, W, H, w.kind, vv, tt, WV_COL[w.seed % WV_COL.length], dpr);
-    if (pm) wvStrip(g, W, H, w, vv, dpr);
+    if (pm || w.duo) wvStrip(g, W, H, w, vv, dpr);
   }
   if (WV.all.size) WV.raf = requestAnimationFrame(wvFrame);
 }
