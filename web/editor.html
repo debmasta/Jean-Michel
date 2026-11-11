@@ -195,8 +195,8 @@
   .lypick .kl { color: var(--t1); min-width: 44px; }
   .lypick select { flex: 1; min-width: 0; height: 38px; font-size: 18px; color: var(--t1); background-color: var(--s2); border: 1px solid var(--line); }
   .lypick button { width: 38px; height: 38px; font-size: 22px; line-height: 1; padding: 0; }
-  .wv { display: block; width: 100%; height: 92px; margin: 6px 0 2px; background: radial-gradient(120% 140% at 50% 50%, #0b1030 0%, #04060f 70%); border: 1px solid var(--line); }
-  :root[data-skin="wb"] .wv { border: 2px solid; border-color: var(--wK) var(--wW) var(--wW) var(--wK); background: radial-gradient(120% 140% at 50% 50%, #0b1a44 0%, #000814 75%); }
+  .wv { display: block; width: 100%; height: 92px; margin: 6px 0 2px; background: linear-gradient(#2e2f31, #232426); border: 1px solid var(--line); }
+  :root[data-skin="wb"] .wv { border: 2px solid; border-color: var(--wK) var(--wW) var(--wW) var(--wK); }
   #jmpages h3 { margin: 14px 0 0; font-size: inherit; color: var(--t1); }
   .knob { --c: var(--t1); position: relative; padding: 8px 10px 10px; min-width: 0; border-left: 1px solid var(--line);
           display: flex; flex-direction: column; gap: 4px; }
@@ -10456,7 +10456,7 @@ function wvVals(row) {                              /* the page's knobs, 0..1, b
   o.get = (re, j, df = 0.5) => { for (const k in o) if (k !== "list" && k !== "get" && re.test(k)) return o[k]; return o.list[j] ?? df; };
   return o;
 }
-const WV_COL = [["#2f7bff", "#ff2fb8", "#ffb31f"], ["#22e6ff", "#7b5cff", "#ff4fd8"], ["#ff5a1f", "#ffd21f", "#ff2f6a"], ["#2fffa0", "#22c4ff", "#b05cff"]];
+const WV_COL = [["#5b7fc0", "#c8678f", "#d9a441"], ["#4fa59b", "#5b7fc0", "#c8678f"], ["#e4684f", "#d9a441", "#c8678f"], ["#4fa59b", "#d9a441", "#e4684f"]];   /* (graphite, as ÉCRAN 2) */
 function wvFrame(now) {
   WV.raf = 0;
   const tt = (now - WV.t0) / 1000;
@@ -10473,7 +10473,7 @@ function wvFrame(now) {
 function wvGrad(g, W, cols) { const x = g.createLinearGradient(0, 0, W, 0); cols.forEach((c, i) => x.addColorStop(i / (cols.length - 1), c)); return x; }
 function wvStroke(g, pts, col, w, dpr) {           /* a glowing line: a wide soft pass, then the bright core */
   g.lineJoin = "round"; g.lineCap = "round";
-  for (const [lw, a, b] of [[w * 5, 0.18, 14], [w * 2, 0.5, 6], [w, 1, 0]]) {
+  for (const [lw, a, b] of [[w * 3, 0.06, 4], [w * 1.6, 0.25, 2], [w, 1, 0]]) {
     g.globalAlpha = a; g.lineWidth = lw * dpr; g.shadowBlur = b * dpr; g.shadowColor = typeof col === "string" ? col : "#fff"; g.strokeStyle = col;
     g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
   }
@@ -10483,15 +10483,15 @@ function wvMirror(g, W, H, amp, col, dpr, bars) {  /* a mirrored glowing wavefor
   const m = H / 2, n = bars || Math.floor(W / (3 * dpr));
   g.fillStyle = col; g.shadowColor = "#ffffff"; 
   for (let i = 0; i < n; i++) {
-    const x = (i + 0.5) / n, a = Math.max(0.02, Math.min(1, amp(x))) * (m - 4 * dpr), bw = bars ? (W / n) * 0.62 : 1.6 * dpr;
-    g.globalAlpha = 0.25; g.shadowBlur = 10 * dpr; g.fillRect(x * W - bw, m - a * 1.08, bw * 2, a * 2.16);
+    const x = (i + 0.5) / n, a = Math.max(0.02, Math.min(1, amp(x))) * (m - 4 * dpr), bw = bars ? (W / n) * 0.62 : 2.4 * dpr;
+    g.globalAlpha = 0.08; g.shadowBlur = 3 * dpr; g.fillRect(x * W - bw, m - a * 1.08, bw * 2, a * 2.16);
     g.globalAlpha = 0.95; g.shadowBlur = 0; g.fillRect(x * W - bw / 2, m - a, bw, a * 2);
   }
   g.globalAlpha = 1; g.shadowBlur = 0;
 }
 function wvDraw(g, W, H, kind, v, t, cols, dpr) {
   g.clearRect(0, 0, W, H);
-  g.globalCompositeOperation = "lighter";
+  g.globalCompositeOperation = "source-over";
   const m = H / 2, A = m * 0.82, grad = wvGrad(g, W, cols), N = 220;
   const line = (f) => Array.from({ length: N + 1 }, (_, i) => [i / N * W, m - f(i / N) * A]);
   const noise = (x) => { const s = Math.sin(x * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -10543,7 +10543,7 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
     const pts = line(f), fill = g.createLinearGradient(0, 0, 0, H); fill.addColorStop(0, cols[2] + "88"); fill.addColorStop(1, cols[0] + "00");
     g.fillStyle = fill; g.beginPath(); g.moveTo(0, H); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(W, H); g.fill();
     wvStroke(g, pts, grad, 2, dpr);
-    const px = ((t * 0.3) % 1) * W; g.fillStyle = "#fff"; g.shadowBlur = 12 * dpr; g.shadowColor = cols[1];
+    const px = ((t * 0.3) % 1) * W; g.fillStyle = "#ece6da"; g.shadowBlur = 3 * dpr; g.shadowColor = cols[1];
     g.beginPath(); g.arc(px, m - f(px / W) * A, 3 * dpr, 0, 7); g.fill(); g.shadowBlur = 0;
   } else {                                          /* rhythm / voice: an equalizer of pulses, its pattern from the knobs */
     const s = v.list.reduce((p, x, i) => p + x * (i + 1), 0), n = 32, beat = Math.floor(t * 4);
@@ -10551,7 +10551,7 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
     for (let i = 0; i < n; i++) {
       const on = noise(i * 3.1 + Math.floor(s * 17)) < 0.35 + (v.list[1] || 0.3) * 0.5, hot = (i % 16) === beat % 16;
       const h = (on ? 0.35 + 0.65 * noise(i + s) : 0.08) * (hot ? 1 : 0.75) * H * 0.9, x = (i + 0.15) / n * W, bw = W / n * 0.7;
-      g.globalAlpha = hot ? 1 : 0.7; g.shadowBlur = hot ? 14 * dpr : 4 * dpr; g.shadowColor = cols[1];
+      g.globalAlpha = hot ? 1 : 0.7; g.shadowBlur = hot ? 4 * dpr : 0; g.shadowColor = cols[1];
       g.fillRect(x, H - h - 3 * dpr, bw, h);
     }
     g.globalAlpha = 1; g.shadowBlur = 0;
