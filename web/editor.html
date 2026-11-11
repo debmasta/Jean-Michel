@@ -119,7 +119,7 @@
   .brand { display: flex; align-items: flex-end; gap: 10px; color: var(--fg); text-decoration: none; }
   .brand svg { width: 132px; height: auto; display: block; }
   .brand svg.jmcat { width: 48px; image-rendering: pixelated; }
-  .brand .jmname { font-size: 15px; letter-spacing: 1px; white-space: nowrap; color: var(--fg); padding-bottom: 2px; }
+  .brand .jmname { font-size: 16px; letter-spacing: 1px; white-space: nowrap; color: var(--fg); padding-bottom: 2px; }
   .brand span { color: var(--dim); text-transform: lowercase; padding-bottom: 2px; }
   .tabs { display: flex; flex-direction: column; gap: 2px; }
   .tabs .navh { color: var(--s3); margin: 14px 0 4px 12px; text-transform: lowercase; }
@@ -193,7 +193,7 @@
   .jmfx button.on { background: var(--t1); color: #000; border-color: var(--t1); }
   .trkhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin: 18px 0 8px; background: var(--s2); border-left: 6px solid var(--accent, #ff9a1f); }
   #t1head { margin-top: 0; }
-  .trkhead .trkn { font-size: 20px; letter-spacing: 1px; min-width: 150px; }
+  .trkhead .trkn { font-size: 16px; letter-spacing: 1px; min-width: 150px; }
   .trkpick { display: flex; align-items: center; gap: 6px; flex: 1 1 340px; min-width: 0; }
   .trkpick select { flex: 1; min-width: 0; height: 36px; font-size: 16px; }
   .trkpick > button { width: 36px; height: 36px; font-size: 22px; padding: 0; }
@@ -218,20 +218,20 @@
   :root[data-title] .group { position: relative; }
   :root[data-title] .group > h2 .fbtn { position: absolute !important; right: 10px; left: auto !important; top: 8px; margin: 0 !important; }
   /* PLAQUE: a little brushed-metal nameplate, engraved, two screws */
-  :root[data-title="plaque"] .group > h2 { font-size: 13px !important; letter-spacing: 3px; color: #2a2c31 !important; display: inline-flex !important; gap: 8px;
+  :root[data-title="plaque"] .group > h2 { font-size: 16px !important; letter-spacing: 3px; color: #2a2c31 !important; display: inline-flex !important; gap: 8px;
     padding: 5px 22px 4px; margin: 0 0 8px !important; border-radius: 3px; text-shadow: 0 1px 0 #ffffffa0;
     background: radial-gradient(circle at 8px 50%, #55585f 1.6px, #0000 2.4px), radial-gradient(circle at calc(100% - 8px) 50%, #55585f 1.6px, #0000 2.4px),
                 repeating-linear-gradient(90deg, #c9ccd2 0 1px, #b7bac1 1px 3px);
     box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 #6d7078, 0 2px 4px #0007; }
   :root[data-title="plaque"] .group > h2 svg { filter: brightness(.25); }
   /* INDEX: a big orange number, the name light and wide, a hairline */
-  :root[data-title="index"] .group > h2 { font-size: 15px !important; letter-spacing: 4px; font-weight: 300; color: #e8ecf5; display: flex !important; align-items: baseline;
+  :root[data-title="index"] .group > h2 { font-size: 16px !important; letter-spacing: 4px; font-weight: 300; color: #e8ecf5; display: flex !important; align-items: baseline;
     gap: 12px; padding-bottom: 6px; margin: 0 0 8px !important; border-bottom: 1px solid #ffffff30; }
-  :root[data-title="index"] .group > h2::before { content: counter(blk, decimal-leading-zero); font-size: 26px; letter-spacing: 0; color: var(--wO, #ff9a1f); line-height: 1; }
+  :root[data-title="index"] .group > h2::before { content: counter(blk, decimal-leading-zero); font-size: 32px; letter-spacing: 0; color: var(--wO, #ff9a1f); line-height: 1; }
   :root[data-title="index"] .group > h2 svg { display: none; }
   /* ONGLET: a folder tab on the block's top edge, an LED */
   :root[data-title="onglet"] #p-sound.pm .group, :root[data-title="onglet"] #p-sound.pm #jmpages > .group { margin-top: 22px; }
-  :root[data-title="onglet"] .group > h2 { position: absolute; top: -27px; left: -1px; height: 26px; font-size: 13px !important; letter-spacing: 2px;
+  :root[data-title="onglet"] .group > h2 { position: absolute; top: -27px; left: -1px; height: 26px; font-size: 16px !important; letter-spacing: 2px;
     display: inline-flex !important; align-items: center; gap: 8px; margin: 0 !important; padding: 0 16px 0 10px; color: #e8ecf5;
     background: var(--s1); border: 1px solid var(--line); border-bottom: 0; border-radius: 6px 6px 0 0; }
   :root[data-title="onglet"] .group > h2::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--wO, #ff9a1f); box-shadow: 0 0 6px var(--wO, #ff9a1f); }
@@ -240,7 +240,7 @@
   :root[data-title="onglet"] .group > .ptabs { margin-top: 2px; }
   :root[data-title="onglet"] .group > h2 .fbtn { top: 32px; }
   /* LED: the name in a small amber display, like the device's */
-  :root[data-title="led"] .group > h2 { display: inline-flex !important; align-items: center; gap: 8px; margin: 0 0 8px !important; padding: 4px 12px; font-size: 14px !important;
+  :root[data-title="led"] .group > h2 { display: inline-flex !important; align-items: center; gap: 8px; margin: 0 0 8px !important; padding: 4px 12px; font-size: 16px !important;
     letter-spacing: 3px; color: #ffb347 !important; text-shadow: 0 0 6px #ff9a1f, 0 0 1px #ffd9a0; border-radius: 4px;
     background: linear-gradient(#0d0b08, #1a1510); box-shadow: inset 0 2px 5px #000, inset 0 0 0 1px #3a2e1a, 0 1px 0 #ffffff25; }
   :root[data-title="led"] .group > h2 svg { filter: sepia(1) saturate(6) hue-rotate(-10deg) drop-shadow(0 0 3px #ff9a1f); }
@@ -264,7 +264,7 @@
                 radial-gradient(circle at 3px calc(100% - 3px), #3a3c42 1.6px, #0000 2.2px),
                 radial-gradient(circle at calc(100% - 3px) calc(100% - 3px), #3a3c42 1.6px, #0000 2.2px); }
   :root[data-look="machine"] .scr .wv { border: 2px solid #1a1b1e !important; box-shadow: inset 0 0 10px #000; }
-  :root[data-look="machine"] .group > h2 { font-size: 13px !important; letter-spacing: 4px; text-transform: uppercase; color: #e8ecf5;
+  :root[data-look="machine"] .group > h2 { font-size: 16px !important; letter-spacing: 4px; text-transform: uppercase; color: #e8ecf5;
     display: flex; align-items: center; gap: 10px; }
   :root[data-look="machine"] .group > h2::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, #e8ecf5, #e8ecf500); order: 1; }
   :root[data-look="machine"] .group > h2 .fbtn { order: 2; margin-left: 0; }
@@ -291,7 +291,7 @@
   #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
   #p-sound.pm #jmpages { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
   #p-sound.pm .group, .fwin .group { margin: 0; padding: 8px 10px 6px; }
-  #p-sound.pm .group h2 { font-size: 18px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  #p-sound.pm .group h2 { font-size: 16px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
   .group h2 .sub { margin-left: auto; }
   .fbtn { display: none; margin-left: auto; width: 28px; height: 26px; padding: 0; font-size: 16px; line-height: 1; }
   #p-sound.pm .fbtn, .fwin .fbtn { display: inline-block; } #p-sound.pm .group h2 .sub { display: none; }
@@ -299,12 +299,12 @@
   #p-sound.pm .group .pg:not(.on) { display: none; }
   .ptabs { display: none; gap: 3px; flex-wrap: wrap; margin: 0 0 5px; }
   #p-sound.pm .ptabs { display: flex; } .fwin .ptabs { display: none; }
-  .ptabs button { padding: 2px 7px; font-size: 12px; min-height: 0; height: 22px; }
+  .ptabs button { padding: 2px 7px; font-size: 16px; min-height: 0; height: 22px; }
   .ptabs button.on { background: var(--trk, #ff9a1f); color: #000; }
   #p-sound.pm .wv { height: 58px; margin: 2px 0 4px; }
   #p-sound.pm .knob { padding: 3px 6px 5px; gap: 2px; }
-  #p-sound.pm .knob .v { font-size: 20px; line-height: 22px; } #p-sound.pm .knob .v small { font-size: 11px; }
-  #p-sound.pm .knob.enum select { height: 26px; margin-top: 2px; font-size: 13px; }
+  #p-sound.pm .knob .v { font-size: 16px; line-height: 22px; } #p-sound.pm .knob .v small { font-size: 16px; }
+  #p-sound.pm .knob.enum select { height: 26px; margin-top: 2px; font-size: 16px; }
   #p-sound.pm .card > p.dim, #p-sound.pm #ctlhelp, #p-sound.pm .lyhelp, #p-sound.pm #lypanel > p.dim, #p-sound.pm #jmpanel > p.dim { display: none; }
   #p-sound.pm #browser .acts .bar { display: inline-flex; margin: 0 6px 0 0; }
   #p-sound.pm .card { padding-top: 8px; padding-bottom: 8px; }
@@ -10861,7 +10861,7 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
   } else if (kind === "lcd") {                      /* any other page: a little FM-1 screen, its four values as bars */
     g.fillStyle = "#050505"; g.fillRect(0, 0, W, H);
     const C = ["#ff9a1f", "#5fd35f", "#ffd21f", "#4fc3ff"], ks = Object.keys(v.txt), n = Math.max(1, ks.length), cw = W / 4;
-    g.font = `${Math.round(H * 0.21)}px ${WV.font || (WV.font = getComputedStyle(document.body).fontFamily)}`;
+    g.font = `${16 * dpr}px ${WV.font || (WV.font = getComputedStyle(document.body).fontFamily)}`;
     ks.slice(0, 4).forEach((k, i) => {
       const x = i * cw + 6 * dpr, w = cw - 12 * dpr, a = v.list[i] || 0;
       g.fillStyle = C[i]; g.fillText(k.slice(0, 6), x, H * 0.24);
