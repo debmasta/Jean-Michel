@@ -321,6 +321,8 @@
   .dcats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 36px; } .dcats button { height: 44px; letter-spacing: 2px; position: relative; }
   .dcats button.on { background: var(--wO, #ff9a1f); color: #000; }
   .dmid .lab { margin-top: 14px; text-align: center; color: var(--dim); }
+  .fxon { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; } .fxon span { letter-spacing: 3px; margin-right: 8px; color: #ffb347; text-shadow: 0 0 6px #ff9a1f; }
+  .fxon button { flex: 0 1 160px; height: 36px; letter-spacing: 2px; } .fxon button.on { background: var(--wO, #ff9a1f); color: #000; }
   /* PANNEAU: tiles */
   #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
   #p-sound.pm .jmbox { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
@@ -882,6 +884,7 @@
       <div class="card" id="jmpanel" hidden>
         <h2>Jean-Michel</h2>
         <p class="dim">FX : clic = on / off, CHAOS tant que tenu. Les pages ci-dessous sont celles du FM-1, en direct.</p>
+        <div class="fxon" id="fxon"><span>EFFETS SUR</span><button type="button" data-v="0">SYNTH 1 + 2</button><button type="button" data-v="1">SYNTH 1</button><button type="button" data-v="2">LAYER</button></div>
         <div id="jmfx" class="jmfx"></div>
         <div id="jmpages"></div>
       </div>
@@ -10890,6 +10893,21 @@ if (window.jmInPlugin) (async () => {
     P.forEach((e, i) => { const v = read(e); if (v != null && v !== last[i]) { last[i] = v; ch.push([i, v]); } });
     if (ch.length) B().emitEvent("pv", ch);
   }, 100);
+})();
+/* ---- EFFETS SUR (Jean-Michel): FX ON, where the note FX (footwork, poly, ...) play: both synths, synth 1, the layer. Set by CC 61
+   (every firmware), read back with JM_TWP (footwork's 4th) when the firmware has it */
+(() => {
+  let v = +(localStorage.getItem("jmFxOn") || 0), t = 0;
+  const show = () => { for (const b of $("fxon").children) if (b.dataset.v != null) b.classList.toggle("on", +b.dataset.v === v); };
+  for (const b of $("fxon").querySelectorAll("button")) b.addEventListener("click", () => {
+    v = +b.dataset.v; t = performance.now(); localStorage.setItem("jmFxOn", v); show();
+    try { if (dev && dev.output) dev.output.send([0xB0, 61, [0, 64, 120][v]]); } catch (e) {}
+  });
+  show();
+  setInterval(async () => {
+    if (!dev || $("jmpanel").hidden || performance.now() - t < 1500) return;
+    try { const r = new Reader(await rq([106, [23]], { timeout: 400, key: "fxon" })); r.b(); if (r.b() >= 4) { for (let k = 0; k < 3; k++) { r.s(); const n = r.b(); r.b(); for (let j = 0; j < n; j++) r.s(); } r.s(); r.b(); v = r.b(); show(); } } catch (e) {}
+  }, 2000);
 })();
 /* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
 const WV = { all: new Set(), t0: performance.now(), raf: 0 };
