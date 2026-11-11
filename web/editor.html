@@ -268,6 +268,25 @@
     display: flex; align-items: center; gap: 10px; }
   :root[data-look="machine"] .group > h2::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, #e8ecf5, #e8ecf500); order: 1; }
   :root[data-look="machine"] .group > h2 .fbtn { order: 2; margin-left: 0; }
+  /* the cable */
+  .jmfx button { position: relative; }
+  .jack { position: absolute; right: 3px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle, #d8141b 0 3px, #111 3.5px);
+          box-shadow: 0 0 0 1.5px #000, inset 0 1px 0 #ffffff40; cursor: pointer; }
+  .jack:hover { transform: scale(1.35); }
+  .fbar .jack.in { position: static; margin-right: 8px; flex: none; }
+  .cbwin .fbar { justify-content: flex-start; } .cbwin .fbar b { flex: 1; letter-spacing: 3px; }
+  .cbwin { background: #15161a !important; border-color: #0b0b0b !important; border-width: 3px !important; color: #e8ecf5; box-shadow: 6px 6px 0 #0b0b0b !important; }
+  .cbwin .fbar { background: #d8141b !important; color: #fff !important; border-bottom: 3px solid #0b0b0b; }
+  .cbbody { padding: 8px 10px 10px; } .cbbody .knobs { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); border-top: 0; }
+  .cbtog { margin-top: 8px; width: 100%; }
+  #cables { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
+  #cables path { fill: none; stroke-linecap: round; }
+  #cables .cb-ink { stroke: #0b0b0b; stroke-width: 11; }
+  #cables .cb-red { stroke: #d8141b; stroke-width: 6.5; }
+  #cables .cb-hi { stroke: #ff8f86; stroke-width: 1.6; opacity: .8; stroke-dasharray: 26 9 4 9; }
+  #cables .cb-pulse { stroke: #fff6d8; stroke-width: 3; stroke-dasharray: 3 37; filter: drop-shadow(0 0 3px #ffd34d); }
+  #cables .cb-plug { fill: #0b0b0b; } #cables .cb-core { fill: #d8141b; }
+  #cables .cb-aura { stroke: #0b0b0b; stroke-width: 2.6; stroke-linecap: round; }
   /* PANNEAU: tiles */
   #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
   #p-sound.pm #jmpages { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
@@ -1049,7 +1068,7 @@
 <script>
 /* Jean-Michel: the screens' look (?look= or localStorage jmLook): verre, crt, machine */
 document.documentElement.dataset.look = new URLSearchParams(location.search).get("look") || localStorage.getItem("jmLook") || "verre";
-document.documentElement.dataset.title = new URLSearchParams(location.search).get("title") || localStorage.getItem("jmTitle") || "plaque";
+document.documentElement.dataset.title = new URLSearchParams(location.search).get("title") || localStorage.getItem("jmTitle") || "led";
 /* Jean-Michel: the logo is the FM-1's intro cat (splash.c), its fur t*(42&t>>10) sliding through the colours */
 document.addEventListener("DOMContentLoaded", () => {
   const b = document.querySelector(".brand"); if (!b) return;
@@ -3532,7 +3551,7 @@ function makeMockDevice(opt = {}) {
         b(st.smp.length); b(SMP.SLOT_SIZE / 1024);
         st.smp.forEach((u) => { b(u.zones); s(u.zones ? u.name : ""); b(u.zones ? Math.ceil(u.len / 1024) : 0); });
         break;
-      case 100: case 101: case 102: case 103: case 104: case 105: {   /* Jean-Michel (?mock=1&jm=1): a few of its pages, the FX window */
+      case 100: case 101: case 102: case 103: case 104: case 105: case 106: {   /* Jean-Michel (?mock=1&jm=1): a few of its pages, the FX window */
         if (!/[?&]jm=1/.test(location.search)) return null;
         const J = st.jm = st.jm || { v: { 1: 12, 4: 2, 65: 0, 66: 0, 72: 2, 73: 2, 74: 0 }, fx: 0,
           d: { 1: ["SOUND", 0, 0, 200, []], 4: ["OCT", 8, 0, 4, ["-2", "-1", "0", "+1", "+2"]], 65: ["FLAM", 3, 0, 127, []], 66: ["STACK", 8, 0, 3, ["OFF", "OCT", "5TH", "OCT+5"]],
@@ -3541,6 +3560,11 @@ function makeMockDevice(opt = {}) {
           "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly", "CHAOS", "remix", "grab", "break"];
         if (cmd === 100) { b(3); s("LAYER"); [1, 4, 127, 127].forEach(b); s("VOICE 4"); [65, 66, 127, 127].forEach(b); s("RHYTHM 2"); [72, 73, 74, 127].forEach(b); }
         else if (cmd === 101) { const d = J.d[a[0]]; if (!d) return null; b(a[0]); b(d[1]); v(d[2]); v(d[3]); v(d[2]); s(d[0]); s(""); d[4].forEach(s); }
+        else if (cmd === 106) { const P = a[0] === 23 ? [["style", ["JUKE", "GHETTO", "ROLLS", "CHOP", "DRILL", "HALF", "SKIP", "STAGR"]], ["vary", ["0", "25", "50", "75", "100"]],
+            ["rate", ["1/4", "1/2", "x1", "x2", "x3", "SLOW", "FAST", "BOUNC"]], ["on", ["BOTH", "MAIN", "LAYER"]]] : a[0] === 14 ? [] : [["rate", ["1/8", "1/16", "1/32", "1/64"]], ["amount", ["SOFT", "MID", "WILD"]]];
+          J.tw = J.tw || {}; const q = J.tw[a[0]] = J.tw[a[0]] || P.map(() => 1);
+          if (a.length >= 3 && P[a[1]]) q[a[1]] = Math.min(P[a[1]][1].length - 1, a[2]);
+          b(a[0]); b(P.length); P.forEach(([l, nm], k) => { s(l); b(nm.length); b(q[k]); nm.forEach((x) => s(x)); }); }
         else if (cmd === 105) { const K = ["BASS", "KEYS", "LEAD", "PUNK", "USER"], f = a[0] | a[1] << 7, n = Math.max(0, Math.min(24, 201 - f));
           v(201); v(f); b(n); for (let i = f; i < f + n; i++) { s(K[Math.floor(i / 41)]); s(K[Math.floor(i / 41)] + " " + i); } }
         else if (cmd === 104) { if (a[0] === 1) J.fx |= 1 << a[1]; else if (a[0] === 2) J.fx &= ~(1 << a[1]); if (a[0] === 1 && a[1] === 14) J.fx = 0; b(LAB.length); LAB.forEach((l, i) => { b((J.fx >> i) & 1); s(l); }); }
@@ -10514,6 +10538,12 @@ function jmFx(a) {
     for (let i = 0; i < n; i++) {
       const b = el("button", { type: "button" });
       if (JM_HIDE.has(i)) b.hidden = true;
+      if (i !== 14) {                                 /* its jack: the settings, wired */
+        const jk = el("span", { class: "jack", title: "réglages (câblés)" });
+        jk.addEventListener("pointerdown", (e) => e.stopPropagation());
+        jk.addEventListener("click", (e) => { e.stopPropagation(); cbOpen(i, b); });
+        b.jack = jk;
+      }
       if (i === 25) {                                 /* CHAOS: as long as it is held */
         b.addEventListener("pointerdown", () => rq([104, [1, i]]).then(jmFx).catch(() => {}));
         for (const ev of ["pointerup", "pointerleave"]) b.addEventListener(ev, () => { if (b.classList.contains("on")) rq([104, [2, i]]).then(jmFx).catch(() => {}); });
@@ -10523,7 +10553,7 @@ function jmFx(a) {
       JM.fx.push(b); box.append(b);
     }
   }
-  for (let i = 0; i < n; i++) { const on = r.b(), lab = r.s(); JM.fx[i].textContent = lab; JM.fx[i].classList.toggle("on", !!on && i !== 14); }
+  for (let i = 0; i < n; i++) { const on = r.b(), lab = r.s(), b = JM.fx[i]; b.replaceChildren(lab, ...(b.jack ? [b.jack] : [])); b.lab = lab; b.classList.toggle("on", !!on && i !== 14); }
 }
 async function jmPoll() {
   if (JM.polling) return;
@@ -10622,6 +10652,72 @@ new MutationObserver(() => { for (const w of document.querySelectorAll(".fwin"))
   .observe($("groups"), { childList: true });
 new MutationObserver(() => pmApply()).observe($("jmpages"), { childList: true });
 pmApply();
+/* ---- the FX's settings, wired (Jean-Michel): a tile's jack opens its window (JM_TWP 106), a fat red ink cable from the tile
+   to the window; it carries a pulse while the FX is on. FX ON (BOTH / MAIN / LAYER) is footwork's 4th, shared by the note FX */
+const CB = { wins: new Map(), svg: null, raf: 0 };
+const CB_NOON = new Set([14, 15, 19, 20, 21, 27]);    /* (no FX ON: all off, the device's keys, grab) */
+function cbParse(a) {
+  const r = new Reader(a), n = r.b(), c = r.b(), ps = [];
+  for (let k = 0; k < c && n !== 0x7F; k++) { const lab = r.s(), nv = r.b(), cur = r.b(), names = []; for (let j = 0; j < nv; j++) names.push(r.s()); ps.push({ lab, cur, names }); }
+  return { n, ps };
+}
+async function cbOpen(i, tile) {
+  if (CB.wins.has(i)) { const w = CB.wins.get(i); w.win.style.zIndex = ++PM.z; return; }
+  let tw, on = null;
+  try { tw = cbParse(await rq([106, [i]], { timeout: 500 })); } catch (e) { return; }
+  if (!CB_NOON.has(i) && i !== 23) try { on = cbParse(await rq([106, [23]], { timeout: 500 })).ps[3] || null; } catch (e) {}
+  const knob = (p, set) => { const sel = el("select", {}, ...p.names.map((nm, j) => el("option", { value: j, text: nm })));
+    sel.value = String(p.cur); sel.addEventListener("change", () => set(+sel.value));
+    return el("div", { class: "knob enum" }, el("span", { class: "kl", text: p.lab }), el("span", { class: "v" }), sel); };
+  const row = el("div", { class: "knobs" }, ...tw.ps.map((p, k) => knob(p, (v) => rq([106, [i, k, v]]).catch(() => {}))),
+    ...(on ? [knob({ ...on, lab: "FX ON" }, (v) => rq([106, [23, 3, v]]).catch(() => {}))] : []));
+  const tog = el("button", { type: "button", class: "cbtog", text: "ON / OFF" });
+  tog.addEventListener("click", () => tile.click());
+  const jack = el("span", { class: "jack in" });
+  const bar = el("div", { class: "fbar" }, jack, el("b", { text: (tile.lab || "").toUpperCase() }), el("button", { type: "button", text: "✕" }));
+  PM.z = Math.max(PM.z, 50);
+  const win = el("div", { class: "fwin cbwin" }, bar, el("div", { class: "cbbody" }, tw.ps.length || on ? row : el("p", { class: "dim", text: "pas de réglage : juste on / off" }), tog));
+  const tr = tile.getBoundingClientRect();
+  Object.assign(win.style, { left: Math.min(innerWidth - 440, tr.right + 60) + "px", top: Math.max(10, Math.min(innerHeight - 260, tr.top - 160)) + "px", width: "420px", zIndex: ++PM.z });
+  document.body.append(win);
+  const w = { win, tile, jack, t0: performance.now() };
+  CB.wins.set(i, w);
+  bar.lastChild.addEventListener("click", () => { win.remove(); CB.wins.delete(i); });
+  win.addEventListener("pointerdown", () => { win.style.zIndex = ++PM.z; });
+  bar.addEventListener("pointerdown", (e) => {
+    if (e.target.tagName === "BUTTON") return;
+    const x0 = e.clientX - win.offsetLeft, y0 = e.clientY - win.offsetTop; bar.setPointerCapture(e.pointerId);
+    const mv = (ev) => { win.style.left = Math.max(0, Math.min(innerWidth - 80, ev.clientX - x0)) + "px"; win.style.top = Math.max(0, Math.min(innerHeight - 30, ev.clientY - y0)) + "px"; };
+    bar.addEventListener("pointermove", mv); bar.addEventListener("pointerup", () => bar.removeEventListener("pointermove", mv), { once: true });
+  });
+  if (!CB.raf) CB.raf = requestAnimationFrame(cbDraw);
+}
+function cbDraw(now) {
+  CB.raf = 0;
+  if (!CB.svg) { CB.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); CB.svg.id = "cables"; document.body.append(CB.svg); }
+  const NS = "http://www.w3.org/2000/svg", parts = [];
+  for (const [i, w] of CB.wins) {
+    if (!w.win.isConnected) { CB.wins.delete(i); continue; }
+    const a = (w.tile.jack || w.tile).getBoundingClientRect(), b = w.jack.getBoundingClientRect();
+    const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, x3 = b.left + b.width / 2, y3 = b.top + b.height / 2;
+    const d = Math.hypot(x3 - x0, y3 - y0), sag = 40 + d * 0.32, sw = Math.sin(now / 900 + i) * 6;   /* (it hangs, and sways a little) */
+    const k = Math.min(1, (now - w.t0) / 260), xe = x0 + (x3 - x0) * k, ye = y0 + (y3 - y0) * k;  /* (it shoots out of the jack) */
+    const path = `M${x0},${y0} C${x0 + sw},${y0 + sag} ${xe - sw},${ye + sag * k} ${xe},${ye}`;
+    const on = w.tile.classList.contains("on");
+    parts.push(`<path d="${path}" class="cb-ink"/><path d="${path}" class="cb-red"/><path d="${path}" class="cb-hi" transform="translate(-1.6,-1.8)"/>`,
+      on ? `<path d="${path}" class="cb-pulse" style="stroke-dashoffset:${(-now / 6) % 400}"/>` : "",
+      `<circle cx="${x0}" cy="${y0}" r="8" class="cb-plug"/><circle cx="${x0}" cy="${y0}" r="3.5" class="cb-core"/>`,
+      k >= 1 ? `<circle cx="${x3}" cy="${y3}" r="8" class="cb-plug"/><circle cx="${x3}" cy="${y3}" r="3.5" class="cb-core"/>` : "");
+    if (on) for (let r = 0; r < 8; r++) {                 /* the aura: ink strokes bursting out of the plug, as in the old manga */
+      const an = r / 8 * Math.PI * 2 + now / 700, r0 = 12 + (now / 40 + r * 7) % 8, r1 = r0 + 7 + (r % 3) * 3;
+      for (const [cx, cy] of [[x0, y0], [x3, y3]])
+        parts.push(`<line x1="${cx + Math.cos(an) * r0}" y1="${cy + Math.sin(an) * r0}" x2="${cx + Math.cos(an) * r1}" y2="${cy + Math.sin(an) * r1}" class="cb-aura"/>`);
+    }
+  }
+  CB.svg.innerHTML = parts.join("");
+  CB.svg.style.zIndex = 45;                          /* (under the windows, over the page) */
+  if (CB.wins.size) CB.raf = requestAnimationFrame(cbDraw);
+}
 /* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
 const WV = { all: new Set(), t0: performance.now(), raf: 0 };
 const WV_KIND = (t) => /^(LAYER )?FX$/.test(t) ? "sends" : /INS|DRIVE|DIST|CRUSH/.test(t) ? "shape"
