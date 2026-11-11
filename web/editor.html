@@ -39,6 +39,21 @@
     --red: #FF4D5E; --t1: var(--wO); --t2: #77EE77; --t3: #FFCC44; --t4: #66DDFF; }
   :root[data-skin="wb"][data-wbv="petrole"] { --wB: #0B4F6C; --wB2: #0A4661; --wW: #F0FAFF; --wK: #00121A; --wO: #FF7A1A; --wL: #5F8A9C; --wOff: #0A3B50; --wD: #A8CFDD; }
   :root[data-skin="wb"][data-wbv="outremer"] { --wB: #2B2F9E; --wB2: #262A8C; --wW: #FFFFFF; --wK: #08082A; --wO: #FF6F3C; --wL: #7478C8; --wOff: #1E2180; --wD: #B9BBF2; }
+  /* BÉTON: light concrete, dark ink, red, black knobs (the default) */
+  :root[data-skin="wb"][data-wbv="beton"] { --wB: #c4c3be; --wB2: #b6b5b0; --wW: #f4f4f1; --wK: #3a3a36; --wO: #e4472b; --wL: #8f8e89; --wOff: #d6d5d0; --wD: #4a4a45;
+    --fg: #1d1d1f; --fg2: #1d1d1f; --t1: #d6401f; --t2: #1f8a3a; --t3: #a86f00; --t4: #1b6fb0; --red: #c8141b; --accent: #e4472b; }
+  :root[data-wbv="beton"] body { background: #c4c3be radial-gradient(circle at 20% 30%, #0000000d 0 1px, #0000 2px) 0 0 / 9px 9px; color: #1d1d1f; }
+  :root[data-wbv="beton"] button { color: #1d1d1f !important; background: #d6d5d0; }
+  :root[data-wbv="beton"] button.on, :root[data-wbv="beton"] button.pri, :root[data-wbv="beton"] .jmfx button.on, :root[data-wbv="beton"] .dcats button.on,
+  :root[data-wbv="beton"] .fxon button.on, :root[data-wbv="beton"] .ptabs button.on { background: #e4472b !important; color: #fff !important; }
+  :root[data-wbv="beton"] .card > h2 { background: #1d1d1f !important; color: #f4f4f1 !important; }
+  :root[data-wbv="beton"] select, :root[data-wbv="beton"] input:not([type=range]) { color: #1d1d1f !important; background: #e6e5e0 !important; }
+  :root[data-wbv="beton"] .trkhead { background: #1d1d1f !important; color: #f4f4f1 !important; border-left-color: #e4472b !important; }
+  :root[data-wbv="beton"] .trkhead select, :root[data-wbv="beton"] .trkhead b { color: #f4f4f1 !important; } :root[data-wbv="beton"] .trkhead select { background: #2e2e2b !important; }
+  :root[data-wbv="beton"] .trkhead button { background: #2e2e2b !important; color: #f4f4f1 !important; }
+  :root[data-wbv="beton"] .rk .kv { color: #1d1d1f; } :root[data-wbv="beton"] .dpager b { color: #1d1d1f; }
+  :root[data-wbv="beton"] .fxon span { color: #1d1d1f; text-shadow: none; }
+  :root[data-wbv="beton"] .jack { box-shadow: 0 0 0 1.5px #000 !important; }
   :root[data-skin="wb"] * { border-radius: 0 !important; box-shadow: none !important; text-shadow: none !important; }
   :root[data-skin="wb"] body { font-weight: 700; }
   :root[data-skin="wb"] .card { background: var(--wB); border: 2px solid; border-color: var(--wW) var(--wK) var(--wK) var(--wW); }
@@ -1132,11 +1147,11 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 /* Jean-Michel: the skin (?skin=wb|fm1, else the last one chosen; FM-1 PAD and the Mac app open in wb) */
 (() => {
-  const K = ["fm1", "wb", "petrole", "outremer"], q = new URLSearchParams(location.search).get("skin");
-  let s; try { s = localStorage.getItem("jmSkin"); } catch (e) {}
+  const K = ["beton", "wb", "petrole", "outremer", "fm1"], q = new URLSearchParams(location.search).get("skin");
+  let s; try { s = localStorage.getItem("jmSkin2"); } catch (e) {}           /* (jmSkin2: BÉTON became the default) */
   const set = (k) => { const r = document.documentElement; r.dataset.skin = k === "fm1" ? "" : "wb"; r.dataset.wbv = k === "wb" || k === "fm1" ? "" : k;
-    try { localStorage.setItem("jmSkin", k); } catch (e) {} window.jmSkin = k; };
-  set(K.includes(s) ? s : K.includes(q) ? q : "fm1");   /* (the last one chosen wins over the default asked for) */
+    try { localStorage.setItem("jmSkin2", k); } catch (e) {} window.jmSkin = k; };
+  set(K.includes(s) ? s : "beton");   /* (the last one chosen wins over the default asked for) */
   document.addEventListener("DOMContentLoaded", () => { const b = document.getElementById("skinbtn");
     if (b) b.addEventListener("click", () => set(K[(K.indexOf(window.jmSkin) + 1) % K.length])); });
 })();
@@ -10822,7 +10837,7 @@ function duoKnob(input, c) {
 function duoShow() {
   if (PM.view !== "duo" || !$("duo")) return;
   if (!duoW) duoW = duoMk();
-  const KC = ["#ff9a1f", "#5fd35f", "#ffd21f", "#4fc3ff", "#e8f0ff"];
+  const KC = ["var(--t1)", "var(--t2)", "var(--t3)", "var(--t4)", "var(--fg)"];
   const c1 = duoPages(1);
   /* the middle: synth 1's categories */
   const names = c1.map((c) => c.name).join("|");
