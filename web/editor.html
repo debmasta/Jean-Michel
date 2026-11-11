@@ -10859,6 +10859,37 @@ for (const n of [1, 2]) {
   side.querySelector(".dpt").addEventListener("click", () => { const d = $("duo"), b = "big" + n; const on = !d.classList.contains(b); d.classList.remove("big1", "big2"); if (on) d.classList.add(b); });
 }
 setInterval(duoShow, 120);
+/* ---- inside FM-1 PAD (Jean-Michel): every parameter of params.json is a host parameter (DAW automation, the controller window).
+   The plugin sends the host's changes to the FM-1 itself; the FM-1's (and the page's) changes go back as "pv"
+   [[index, value] ...], so the DAW follows and records them. FX settings (twp) go one way: the device does not report them */
+if (window.jmInPlugin) (async () => {
+  let P;
+  try { P = await (await fetch("params.json")).json(); } catch (e) { return; }
+  const B = () => window.__JUCE__ && window.__JUCE__.backend, last = new Array(P.length).fill(null);
+  const apply = (i, v) => {
+    const e = P[i]; if (!e || !dev) return;
+    last[i] = v;
+    if (e.kind === "t") userSet(e.s, e.id, v, true);
+    else if (e.kind === "x") { if (e.id === 1 && typeof jmSound === "function" && JMS.n) jmSound(v); else jmSet(e.id, v); }
+    else if (e.kind === "twon") rq([104, [v ? 1 : 2, e.n]]).then(jmFx).catch(() => {});
+    else if (e.kind === "twp") rq([106, [e.n, e.k, v]]).catch(() => {});
+  };
+  const read = (e) => {
+    if (e.kind === "t") { const a = e.s ? dev.dump.g : dev.dump.p; return a && a[e.id] != null ? a[e.id] : null; }
+    if (e.kind === "x") { if (e.id === 1) return JMS.n ? +$("lysel").value : null; const c = JM.ctl.get(e.id); return c ? +c.input.value : null; }
+    if (e.kind === "twon") return JM.fx[e.n] ? (JM.fx[e.n].classList.contains("on") ? 1 : 0) : null;
+    return null;
+  };
+  for (let t = 0; t < 50 && !B(); t++) await new Promise((r) => setTimeout(r, 100));
+  if (!B()) return;
+  /* (the host's changes go to the FM-1 from the plugin itself, editor open or not: apply() stays for a page-side use) */ void apply;
+  setInterval(() => {
+    if (!dev || !dev.dump) return;
+    const ch = [];
+    P.forEach((e, i) => { const v = read(e); if (v != null && v !== last[i]) { last[i] = v; ch.push([i, v]); } });
+    if (ch.length) B().emitEvent("pv", ch);
+  }, 100);
+})();
 /* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
 const WV = { all: new Set(), t0: performance.now(), raf: 0 };
 const WV_KIND = (t) => /^(LAYER )?FX$/.test(t) ? "sends" : /INS|DRIVE|DIST|CRUSH/.test(t) ? "shape"
