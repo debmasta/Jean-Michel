@@ -31,6 +31,32 @@
   ::selection { background: var(--trk); color: #000; }
   [hidden] { display: none !important; }
   .dim { color: var(--dim); }
+
+  /* Jean-Michel: the METAL KAP 2 / PAOLO skin (Amiga Workbench blue, white, black, orange: square bevels, no glow).
+     ?skin=wb (or the SKIN button, kept in the browser); three blues as in METAL KAP 2: bleu, petrole, outremer */
+  :root[data-skin="wb"] { --wB: #0A2A6E; --wB2: #0B2560; --wW: #E8F0FF; --wK: #000814; --wO: #FF9A1F; --wL: #5A73A0; --wOff: #10285A; --wD: #9DB4DD;
+    --bg: var(--wB); --s1: var(--wB2); --s2: var(--wOff); --s3: var(--wL); --line: var(--wL); --dim: var(--wD); --fg2: var(--wW); --fg: #fff;
+    --red: #FF4D5E; --t1: var(--wO); --t2: #77EE77; --t3: #FFCC44; --t4: #66DDFF; }
+  :root[data-skin="wb"][data-wbv="petrole"] { --wB: #0B4F6C; --wB2: #0A4661; --wW: #F0FAFF; --wK: #00121A; --wO: #FF7A1A; --wL: #5F8A9C; --wOff: #0A3B50; --wD: #A8CFDD; }
+  :root[data-skin="wb"][data-wbv="outremer"] { --wB: #2B2F9E; --wB2: #262A8C; --wW: #FFFFFF; --wK: #08082A; --wO: #FF6F3C; --wL: #7478C8; --wOff: #1E2180; --wD: #B9BBF2; }
+  :root[data-skin="wb"] * { border-radius: 0 !important; box-shadow: none !important; text-shadow: none !important; }
+  :root[data-skin="wb"] body { font-weight: 700; }
+  :root[data-skin="wb"] .card { background: var(--wB); border: 2px solid; border-color: var(--wW) var(--wK) var(--wK) var(--wW); }
+  :root[data-skin="wb"] .card > h2 { margin: -14px -16px 12px; padding: 2px 16px; color: var(--wB); background: var(--wW); border-bottom: 2px solid var(--wK); }
+  :root[data-skin="wb"] button { border: 2px solid; border-color: var(--wW) var(--wK) var(--wK) var(--wW); background: var(--wB); color: var(--wW); }
+  :root[data-skin="wb"] button:hover:not(:disabled) { background: var(--wOff); }
+  :root[data-skin="wb"] button.pri, :root[data-skin="wb"] button.on, :root[data-skin="wb"] .jmfx button.on, :root[data-skin="wb"] button[aria-selected="true"] {
+      background: var(--wO) !important; color: var(--wK) !important; border-color: var(--wK) var(--wW) var(--wW) var(--wK) !important; }
+  :root[data-skin="wb"] select, :root[data-skin="wb"] input:not([type=range]):not([type=checkbox]) { background: var(--wB2); color: var(--wW);
+      border: 2px solid; border-color: var(--wK) var(--wW) var(--wW) var(--wK); }
+  :root[data-skin="wb"] input[type=range] { -webkit-appearance: none; appearance: none; height: 16px; background: var(--wB2);
+      border: 2px solid; border-color: var(--wK) var(--wW) var(--wW) var(--wK); }
+  :root[data-skin="wb"] input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 12px; background: var(--wW);
+      border: 0; border-right: 2px solid var(--wK); border-bottom: 2px solid var(--wK); }
+  :root[data-skin="wb"] input[type=range]:active::-webkit-slider-thumb { background: var(--wO); }
+  :root[data-skin="wb"] .knob { border-left-color: var(--wL); }
+  :root[data-skin="wb"] aside { background: var(--wB2); border-right: 2px solid var(--wK); }
+  :root[data-skin="wb"] ::selection { background: var(--wO); color: var(--wK); }
   .ic { font-family: "Fukiai"; font-style: normal; font-weight: 400; font-synthesis: none; line-height: 1; margin-right: .4em;
         -webkit-font-smoothing: antialiased; }
   html:not(.fk) .ic { display: none; }
@@ -531,6 +557,7 @@
       <span id="live"></span>
       <span id="mock" hidden data-t="mock"></span>
       <button id="connect" class="pri" data-t="connect" data-ic="port_usb_c"></button>
+      <button id="skinbtn" type="button" title="Skin : FM-1, Workbench bleu, pétrole, outremer">SKIN</button>
       <div class="links"><a class="dim" href="../installer/" data-t="installer"></a><button class="lang" id="lang"></button></div>
       <button id="install" class="pri" data-t="install" hidden></button>
       <!--DL--><a class="dim" id="offline" href="clipper-editor.html" download="clipper-editor.html" data-t="offline"></a><!--/DL-->
@@ -889,6 +916,16 @@
   </main>
 </div>
 <script>
+/* Jean-Michel: the skin (?skin=wb|fm1, else the last one chosen; FM-1 PAD and the Mac app open in wb) */
+(() => {
+  const K = ["fm1", "wb", "petrole", "outremer"], q = new URLSearchParams(location.search).get("skin");
+  let s; try { s = localStorage.getItem("jmSkin"); } catch (e) {}
+  const set = (k) => { const r = document.documentElement; r.dataset.skin = k === "fm1" ? "" : "wb"; r.dataset.wbv = k === "wb" || k === "fm1" ? "" : k;
+    try { localStorage.setItem("jmSkin", k); } catch (e) {} window.jmSkin = k; };
+  set(K.includes(s) ? s : K.includes(q) ? q : "fm1");   /* (the last one chosen wins over the default asked for) */
+  document.addEventListener("DOMContentLoaded", () => { const b = document.getElementById("skinbtn");
+    if (b) b.addEventListener("click", () => set(K[(K.indexOf(window.jmSkin) + 1) % K.length])); });
+})();
 "use strict";
 /*PROTO-BEGIN*/
 /* ---------------------------------------------------------------- protocol --- */

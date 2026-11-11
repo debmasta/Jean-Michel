@@ -17,7 +17,7 @@ ED="$ED"
 DATA="\$HOME/Library/Application Support/FM-1 Editor"
 for B in "Google Chrome" "Microsoft Edge" "Chromium"; do
   if open -Ra "\$B" 2>/dev/null; then
-    open -na "\$B" --args --app="file://\$ED" --user-data-dir="\$DATA" --window-size=1300,950
+    open -na "\$B" --args --app="file://\$ED?skin=wb" --user-data-dir="\$DATA" --window-size=1300,950
     exit 0
   fi
 done
