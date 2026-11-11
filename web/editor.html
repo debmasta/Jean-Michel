@@ -191,6 +191,16 @@
   .jmfx { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 8px 0 14px; }
   .jmfx button { padding: 10px 4px; background: var(--s2, #111); color: inherit; border: 1px solid var(--line); cursor: pointer; }
   .jmfx button.on { background: var(--t1); color: #000; border-color: var(--t1); }
+  .trkhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin: 18px 0 8px; background: var(--s2); border-left: 6px solid var(--accent, #ff9a1f); }
+  #t1head { margin-top: 0; }
+  .trkhead .trkn { font-size: 20px; letter-spacing: 1px; min-width: 150px; }
+  .trkpick { display: flex; align-items: center; gap: 6px; flex: 1 1 340px; min-width: 0; }
+  .trkpick select { flex: 1; min-width: 0; height: 36px; font-size: 16px; }
+  .trkpick > button { width: 36px; height: 36px; font-size: 22px; padding: 0; }
+  .trkhead .lypick { margin: 0; flex: 1; } .trkhead .lypick .kl { display: none; }
+  .trkvol { display: flex; align-items: center; gap: 8px; flex: 0 1 260px; }
+  .trkvol input { flex: 1; } .trkvol b { min-width: 3ch; text-align: right; }
+  :root[data-skin="wb"] .trkhead { background: var(--wW); color: var(--wB); border-left-color: var(--wO); }
   .lypick { display: flex; align-items: center; gap: 6px; margin: 4px 0 10px; }
   .lypick .kl { color: var(--t1); min-width: 44px; }
   .lypick select { flex: 1; min-width: 0; height: 38px; font-size: 18px; color: var(--t1); background-color: var(--s2); border: 1px solid var(--line); }
@@ -581,6 +591,10 @@
     <p class="hint" id="hint" hidden></p>
 
     <section class="panel" id="p-sound" data-tab="sound" data-dev hidden>
+      <!-- Jean-Michel: the two synths as two blocks, each with its sound and its volume on top -->
+      <div class="trkhead" id="t1head"><b class="trkn" id="t1name">SYNTH 1</b>
+        <span class="trkpick" id="t1pick"><button type="button" id="t1prev" title="preset précédent">&lsaquo;</button><button type="button" id="t1next" title="preset suivant">&rsaquo;</button></span>
+        <label class="trkvol"><span>VOL</span><input type="range" id="t1vol" min="0" max="127" step="1"><b id="t1volv"></b></label></div>
       <div class="card">
         <div class="browser" id="browser">
           <label class="fld"><span data-t="engine"></span><select id="engine"></select></label>
@@ -652,22 +666,6 @@
           <label><span data-t="fxStoreTo"></span> <select id="fxslot"></select></label> <button id="fxstore" data-t="fxStore"></button></p>
         <div id="fxbody"></div>
       </div>
-      <!-- Clipper 0.3: the LAYER (track 2's sound with the instrument's; EDIT > LAYER): its settings by TRACK_PARAM (v4) -->
-      <div class="card" id="lypanel" hidden>
-        <h2 data-t="lyTitle" data-ic="symbol_keyboard"></h2>
-        <p class="dim" data-t="lyHelp"></p>
-        <p class="dim" id="lysound"></p>
-        <div class="lypick" id="lypick" hidden><span class="kl">SON</span>
-          <button type="button" id="lyprev" title="son précédent">&lsaquo;</button><select id="lysel"></select><button type="button" id="lynext" title="son suivant">&rsaquo;</button></div>
-        <div class="knobs" id="lybody"></div>
-      </div>
-      <!-- Jean-Michel: the FX window and the device's own pages (layer sound, VOICE 4/5, RHYTHM, BYTE MEM, LAYER FX/INS); hidden on other firmware -->
-      <div class="card" id="jmpanel" hidden>
-        <h2>Jean-Michel</h2>
-        <p class="dim">FX : clic = on / off, CHAOS tant que tenu. Les pages ci-dessous sont celles du FM-1, en direct.</p>
-        <div id="jmfx" class="jmfx"></div>
-        <div id="jmpages"></div>
-      </div>
       <!-- Clipper 0.9: the TUNING (firmware protocol v14): kept with the FM-1's settings -->
       <div class="card" id="tupanel" hidden>
         <h2 data-t="tuTitle" data-ic="ui_knob"></h2>
@@ -702,6 +700,25 @@
           <input type="file" id="hyfile" accept=".json,application/json" hidden>
           <label><span data-t="name"></span> <input type="text" id="hyname" maxlength="10" size="11"></label></p>
         <div id="hybody"></div>
+      </div>
+      <div class="trkhead" id="t2head" hidden><b class="trkn">SYNTH 2 · LAYER</b>
+        <span class="trkpick" id="t2pick"></span>
+        <label class="trkvol"><span>VOL</span><input type="range" id="t2vol" min="0" max="127" step="1"><b id="t2volv"></b></label></div>
+      <!-- Clipper 0.3: the LAYER (track 2's sound with the instrument's; EDIT > LAYER): its settings by TRACK_PARAM (v4) -->
+      <div class="card" id="lypanel" hidden>
+        <h2 data-t="lyTitle" data-ic="symbol_keyboard"></h2>
+        <p class="dim" data-t="lyHelp"></p>
+        <p class="dim" id="lysound"></p>
+        <div class="lypick" id="lypick" hidden><span class="kl">SON</span>
+          <button type="button" id="lyprev" title="son précédent">&lsaquo;</button><select id="lysel"></select><button type="button" id="lynext" title="son suivant">&rsaquo;</button></div>
+        <div class="knobs" id="lybody"></div>
+      </div>
+      <!-- Jean-Michel: the FX window and the device's own pages (layer sound, VOICE 4/5, RHYTHM, BYTE MEM, LAYER FX/INS); hidden on other firmware -->
+      <div class="card" id="jmpanel" hidden>
+        <h2>Jean-Michel</h2>
+        <p class="dim">FX : clic = on / off, CHAOS tant que tenu. Les pages ci-dessous sont celles du FM-1, en direct.</p>
+        <div id="jmfx" class="jmfx"></div>
+        <div id="jmpages"></div>
       </div>
     </section>
 
@@ -9813,7 +9830,7 @@ const LY_CTL = [
   [50, { label: "FILT", fmt: F.FILT, min: -64, max: 63, def: 0, names: [] }],
 ];
 const LY_CH = [29, { label: "CH", fmt: F.INT, min: 1, max: 16, def: 2, names: [] }];   /* (MULTI: SPLIT's knob, 0.6) */
-const lyCtls = (p) => LY_CTL.map((c, i) => (i === 1 && p[LY_MODE] === LY_MULTI ? LY_CH : c));
+const lyCtls = (p) => LY_CTL.map((c, i) => (i === 1 && p[LY_MODE] === LY_MULTI ? LY_CH : c)).filter(([id]) => id !== 0);   /* (LEVEL: in SYNTH 2's head) */
 const ly = { rows: new Map(), multi: null, t: {} };   /* t: id -> the user's last change (performance.now()) */
 const lyOk = () => synthOnly() && dev.info.proto >= 4 && dev.info.ntrk >= 2 && (dev.info.pe0 >= 78 || bkFwAtLeast(dev.info.version, [0, 3, 0]));
 const lyTrack = () => (dev && dev.mix && dev.mix.tracks[1] && dev.mix.tracks[1].p ? dev.mix.tracks[1] : null);
@@ -10419,6 +10436,33 @@ async function jmPoll() {
   } finally { JM.polling = false; }
 }
 setInterval(jmPoll, 700);
+/* ---- the two synths' heads (Jean-Michel): SYNTH 1 = the selected track, its engine / preset and level; SYNTH 2 = the layer */
+(() => {
+  const pk = $("t1pick"), eng = $("engine"), pre = $("preset");
+  pre.removeAttribute("size");
+  pk.insertBefore(eng, $("t1prev")); pk.insertBefore(pre, $("t1next"));
+  for (const f of document.querySelectorAll("#browser > .fld")) if (!f.querySelector("select")) f.hidden = true;
+  const step = (d) => { if (!dev || pre.disabled || !pre.options.length) return; const i = Math.max(0, Math.min(pre.options.length - 1, pre.selectedIndex + d));
+    if (i !== pre.selectedIndex) { pre.selectedIndex = i; pre.dispatchEvent(new Event("change")); } };
+  $("t1prev").addEventListener("click", () => step(-1)); $("t1next").addEventListener("click", () => step(1));
+  $("t2pick").append($("lypick"));
+  let t1 = 0, t2 = 0;
+  $("t1vol").addEventListener("input", () => { if (!dev || !dev.mix) return; t1 = performance.now(); $("t1volv").textContent = $("t1vol").value; setLevel(dev.sel, +$("t1vol").value); });
+  $("t2vol").addEventListener("input", () => { t2 = performance.now(); $("t2volv").textContent = $("t2vol").value; lySet(0, +$("t2vol").value); });
+  setInterval(() => {
+    const on = !!dev && !!dev.mix;
+    $("t1head").querySelector(".trkvol").hidden = !on;
+    if (on) {
+      const x = dev.mix.tracks[dev.sel];
+      $("t1name").textContent = dev.sel === 0 ? "SYNTH 1" : `PISTE ${dev.sel + 1}`;
+      if (x && performance.now() - t1 > 800 && document.activeElement !== $("t1vol")) { $("t1vol").value = String(x.level); $("t1volv").textContent = String(x.level); }
+    }
+    const y = on && lyOk() && lyTrack();
+    $("t2head").hidden = !y && $("jmpanel").hidden;
+    $("t2head").querySelector(".trkvol").hidden = !y;
+    if (y && performance.now() - t2 > 800 && document.activeElement !== $("t2vol")) { $("t2vol").value = String(y.p[0]); $("t2volv").textContent = String(y.p[0]); }
+  }, 250);
+})();
 /* ---- the waves: a neon picture of what each FX / filter / delay / reverb / LFO / ENV page does, from its knobs, live */
 const WV = { all: new Set(), t0: performance.now(), raf: 0 };
 const WV_KIND = (t) => /^(LAYER )?FX$/.test(t) ? "sends" : /INS|DRIVE|DIST|CRUSH/.test(t) ? "shape"
@@ -10445,15 +10489,23 @@ setInterval(() => {
   try { wvScope.postMessage({ type: "jm", pages }, "*"); } catch (e) {}
 }, 200);
 function wvVals(row) {                              /* the page's knobs, 0..1, by label */
-  const o = { list: [] };
+  const o = { list: [], txt: {} };
   for (const k of row.querySelectorAll(".knob")) {
     const i = k.querySelector("input,select"), l = (k.querySelector(".kl") || {}).textContent || "";
     if (!i) continue;
     const n = i.tagName === "SELECT" ? (i.options.length > 1 ? i.selectedIndex / (i.options.length - 1) : 0)
       : (+i.value - +i.min) / Math.max(1, +i.max - +i.min);
     o.list.push(n); o[l.toUpperCase()] = n;
+    o.txt[l.toUpperCase()] = i.tagName === "SELECT" ? ((i.selectedOptions[0] || {}).textContent || "") : ((k.querySelector(".v") || {}).textContent || "");
   }
-  o.get = (re, j, df = 0.5) => { for (const k in o) if (k !== "list" && k !== "get" && re.test(k)) return o[k]; return o.list[j] ?? df; };
+  /* a rate as the knob shows it, in Hz: "0.41Hz", "1/8" (on the tempo), "2.0s" */
+  o.hz = (re, df) => { for (const k in o.txt) if (re.test(k)) { const x = o.txt[k], m = /([\d.]+)\s*Hz/i.exec(x), f = /(\d+)\s*\/\s*(\d+)(\.|T)?/.exec(x), s = /([\d.]+)\s*(m?s)\b/.exec(x);
+      const bpm = (typeof dev !== "undefined" && dev && dev.dump && dev.gdesc) ? gBpm() : 120;
+      if (m) return +m[1];
+      if (f) return (bpm / 60) / (4 * f[1] / f[2]) / (f[3] === "." ? 1.5 : f[3] === "T" ? 2 / 3 : 1);
+      if (s) return 1 / Math.max(0.001, +s[1] / (s[2] === "ms" ? 1000 : 1)); }
+    return df; };
+  o.get = (re, j, df = 0.5) => { for (const k in o) if (typeof o[k] === "number" && re.test(k)) return o[k]; return o.list[j] ?? df; };
   return o;
 }
 const WV_COL = [["#5b7fc0", "#c8678f", "#d9a441"], ["#4fa59b", "#5b7fc0", "#c8678f"], ["#e4684f", "#d9a441", "#c8678f"], ["#4fa59b", "#d9a441", "#e4684f"]];   /* (graphite, as ÉCRAN 2) */
@@ -10468,7 +10520,7 @@ function wvFrame(now) {
     if (w.c.width !== W || w.c.height !== H) { w.c.width = W; w.c.height = H; }
     wvDraw(w.c.getContext("2d"), W, H, w.kind, wvVals(w.row), tt, WV_COL[w.seed % WV_COL.length], dpr);
   }
-  if (WV.all.size) WV.raf = requestAnimationFrame((n) => setTimeout(() => wvFrame(n), 16));
+  if (WV.all.size) WV.raf = requestAnimationFrame(wvFrame);
 }
 function wvGrad(g, W, cols) { const x = g.createLinearGradient(0, 0, W, 0); cols.forEach((c, i) => x.addColorStop(i / (cols.length - 1), c)); return x; }
 function wvStroke(g, pts, col, w, dpr) {           /* a glowing line: a wide soft pass, then the bright core */
@@ -10512,7 +10564,7 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
     wvStroke(g, pts, grad, 2, dpr);
   } else if (kind === "delay") {                    /* the repeats: a hit, then echoes spaced by TIME, fading by FDBK */
     const tm = v.get(/TIME|DLY$|RATE/, 0, 0.4), fb = v.get(/FDBK|FB|FEED/, 1, 0.5), mx = v.get(/MIX|LEVEL|WET|AMT/, 2, 0.6);
-    const gap = 0.06 + tm * 0.22, roll = (t * 0.12) % 1;
+    const sec = 1 / v.hz(/TIME|DLY$|RATE/, 1 / (0.05 + tm * 0.6)), gap = Math.max(0.02, sec / 2), roll = (t % (sec * 8)) / 2 / gap;   /* (2 s across) */
     wvMirror(g, W, H, (x) => { let a = 0; for (let k = 0, p = 0.04; p < 1.2 && k < 24; k++, p += gap) {
         const amp = (k ? mx * Math.pow(0.25 + fb * 0.72, k) : 1), dx = x - p + roll * gap - gap;
         if (dx > 0) a += amp * Math.exp(-dx * 90) * (0.6 + 0.4 * noise(x * 50 + k)); } return a; }, grad, dpr);
@@ -10522,8 +10574,8 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
     wvMirror(g, W, H, (x) => { const d = (x - 0.08 + ph * 0.3 + 1) % 1; return d < 0.02 ? 1 : (0.35 + 0.65 * mx) * Math.exp(-d * (1.5 + (1 - sz) * 9))
       * (0.35 + 0.65 * noise(Math.floor(x * 140) + Math.floor(t * (6 + dp * 10)))); }, grad, dpr);
   } else if (kind === "chorus") {                   /* voices drifting against each other */
-    const dp = v.get(/DEPTH|AMT|DPTH/, 1, 0.5), rt = v.get(/RATE|SPD/, 0, 0.4);
-    for (let k = 0; k < 3; k++) wvStroke(g, line((x) => 0.7 * Math.sin(x * Math.PI * 5 + t * (1 + rt * 4) * (k + 1) * 0.5 + k * dp * 2.4)
+    const dp = v.get(/DEPTH|AMT|DPTH|CDP/, 1, 0.5), hz = v.hz(/RATE|SPD|CRT/, 0.5);
+    for (let k = 0; k < 3; k++) wvStroke(g, line((x) => 0.7 * Math.sin(x * Math.PI * 5 + t * 6 + k * dp * 2.4 * Math.sin(t * hz * 2 * Math.PI + k * 2.1))
       * (0.8 + 0.2 * Math.cos(x * 4 + k))), cols[k], 1.6, dpr);
   } else if (kind === "sends") {                    /* the layer's sends: one lane each (DST CHO DLY REV) */
     const n = Math.max(1, v.list.length);
@@ -10531,11 +10583,17 @@ function wvDraw(g, W, H, kind, v, t, cols, dpr) {
       wvStroke(g, Array.from({ length: N + 1 }, (_, i) => { const x = i / N; return [x * W, y0 - (H / n) * 0.42 * a * Math.sin(x * 40 + t * (3 + k)) *
         Math.pow(Math.abs(Math.sin(x * 7 + t * 0.7 + k)), 6)]; }), cl, 1.4, dpr); });
   } else if (kind === "lfo") {                      /* the LFO's shape, at its rate */
-    const wvn = v.get(/WAVE|SHAPE/, 0, 0), rt = v.get(/RATE|SPD|SPEED/, 1, 0.4), dp = v.get(/DEPTH|AMT/, 2, 0.8);
-    const sh = Math.round(wvn * 4), cyc = 1 + rt * 7;
-    const f = (x) => { const p = (x * cyc + t * 0.5) % 1;
-      return dp * (sh === 0 ? Math.sin(p * 2 * Math.PI) : sh === 1 ? 1 - 4 * Math.abs(p - 0.5) : sh === 2 ? 1 - 2 * p : sh === 3 ? (p < 0.5 ? 1 : -1) : noise(Math.floor(x * cyc * 2 + t)) * 2 - 1) * 0.9; };
-    wvStroke(g, line(f), grad, 2.2, dpr);
+    const wvn = v.get(/WAVE|SHAPE/, 0, 0), rt = v.get(/RATE|SPD|SPEED/, 1, 0.4), dp = /DEPTH|AMT/.test(Object.keys(v.txt).join(" ")) ? Math.max(0.15, v.get(/DEPTH|AMT/, 2, 0.8)) : 0.85;
+    const sh = Math.round(wvn * 4), hz = v.hz(/RATE|SPD|SPEED/, 0.1 * Math.pow(200, rt)), span = 2;   /* 2 s across, now on the right */
+    const f = (x) => { const ph = (x - 1) * span * hz + t * hz, p = ph - Math.floor(ph);
+      return dp * (sh === 0 ? Math.sin(p * 2 * Math.PI) : sh === 1 ? 1 - 4 * Math.abs(p - 0.5) : sh === 2 ? 1 - 2 * p : sh === 3 ? (p < 0.5 ? 1 : -1)
+        : noise(Math.floor(ph)) * 2 - 1) * 0.9; };
+    const n = Math.min(1600, Math.max(240, Math.round(span * hz * 24)));
+    const pts = Array.from({ length: n + 1 }, (_, i) => [i / n * W * 0.97, m - f(i / n * 0.97 + 0.03 * 0) * A]);
+    wvStroke(g, pts, grad, 2, dpr);
+    const y = m - f(0.97) * A; g.fillStyle = "#ece6da"; g.beginPath(); g.arc(W * 0.97, y, 4 * dpr, 0, 7); g.fill();
+    g.fillStyle = cols[1]; g.fillRect(W * 0.985, Math.min(m, y), 4 * dpr, Math.abs(y - m) + 1);
+    g.fillStyle = "#8a8780"; g.font = `${10 * dpr}px ui-monospace, monospace`; g.fillText(hz >= 10 ? hz.toFixed(0) + " Hz" : hz.toFixed(2) + " Hz", 6 * dpr, 13 * dpr);
   } else if (kind === "env") {                      /* ATK DEC SUS REL */
     const [a, d, s, r] = [v.get(/ATK|ATT/, 0, 0.1), v.get(/DEC/, 1, 0.3), v.get(/SUS/, 2, 0.6), v.get(/REL/, 3, 0.4)];
     const tot = a + d + 0.35 + r + 0.01, xa = a / tot, xd = xa + d / tot, xs = xd + 0.35 / tot;
