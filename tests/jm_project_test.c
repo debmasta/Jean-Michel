@@ -34,6 +34,25 @@ int main(void)
         vt_acc[0] = 77; project_save(1); vt_acc[0] = 0; transport_req = 0; project_load(1); chk(vt_acc[0] == 77u, "project: VOICE 5 back");
         f[5] = 80; chk(!bbu_rx(f, 25u), "SysEx: wrong length refused");
     }
+    {   /* the editor's JM commands: pages, a layer sound set by number, an FX tile on and off */
+        static uint8_t f[8] = {0x7D, 0x46, 0x4C, 100};
+        uint32_t tot, before;
+        ed_handle(f, 4);
+        chk(ed_out[4] == 100u && ed_out[5] >= 8u, "JM_PAGES: our pages listed");
+        { uint32_t q = 6, k; for (k = 0; k < ed_out[5]; k++) { printf("  [%s]", (const char *)&ed_out[q]); q += (uint32_t)strlen((const char *)&ed_out[q]) + 5u; } printf("\n"); }
+        trk[1].p[P_LYMODE] = LY_LAYER;
+        before = layer_pos(&tot);
+        f[3] = 103; f[4] = X_LYSOUND; f[5] = (uint8_t)((before + 5u + 8192u) & 127u); f[6] = (uint8_t)((before + 5u + 8192u) >> 7);
+        ed_handle(f, 7);
+        chk(layer_pos(&tot) == before + 5u, "JM_SET: the layer's sound changes");
+        printf("  layer sound now: %s\n", (const char *)&ed_out[8]);
+        f[3] = 104; f[4] = 1; f[5] = TW_POLY; ed_handle(f, 6);
+        chk(tw_is(TW_POLY), "JM_FX: POLY on");
+        f[4] = 2; ed_handle(f, 6);
+        chk(!tw_is(TW_POLY), "JM_FX: POLY off");
+        f[3] = 101; f[4] = X_VSTACK; ed_handle(f, 5);
+        chk(!strcmp((const char *)&ed_out[13], "STACK"), "JM_DESC: VOICE 4 STACK");
+    }
     printf("JM PROJECT: %s\n", fails ? "FAILED" : "ok");
     return fails != 0;
 }

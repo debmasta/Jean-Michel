@@ -870,6 +870,8 @@ int main(int argc, char **argv)
         for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].title, "LAYER FX"); pi++) ;
         check(pi < NPAGES, "LAYER FX page");
         if (pi < NPAGES) { syn_desc(PAGES[pi].id[3], &vp); check(vp == &trk[1].p[P_REV], "LAYER FX: REV is the layer's reverb send"); }
+        { static const char *const OURS[] = {"RHYTHM", "RHYTHM 2", "VOICE 4", "VOICE 5", "BYTE MEM", "LAYER FX", "LAYER INS 2"}; uint32_t q;
+          for (q = 0; q < 7u; q++) { for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].title, OURS[q]); pi++) ; check(pi < NPAGES, OURS[q]); } }
         for (pi = 0; pi < NPAGES && strcmp(PAGES[pi].title, "LAYER INS"); pi++) ;
         check(pi < NPAGES, "LAYER INS page");
         if (pi < NPAGES) {

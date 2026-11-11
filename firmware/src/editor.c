@@ -876,6 +876,97 @@ UI_SMALL static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes b
         ed_b(a[1] & 3u);
         ed_b(project_used(a[1] & 3u));
         break;
+#if CLIPPER_SYNTH
+    /* Jean-Michel (web/editor.html, its JM card): the pages of the device's own (SC_SYN) the editor had not, the FX window */
+    case 100: {                                            /* JM_PAGES: n, then title, 4 ids (127 = none) per page */
+        uint32_t pi, k, n = 0;
+        for (pi = 0; pi < NPAGES; pi++)
+            n += PAGES[pi].scope == SC_SYN && (PAGES[pi].graph == GR_LAYER || (PAGES[pi].id[0] != 0xFFu && PAGES[pi].id[0] >= 57u));
+        ed_b(n);
+        for (pi = 0; pi < NPAGES; pi++)
+            if (PAGES[pi].scope == SC_SYN && (PAGES[pi].graph == GR_LAYER || (PAGES[pi].id[0] != 0xFFu && PAGES[pi].id[0] >= 57u))) {
+                ed_str(PAGES[pi].title, 12);
+                for (k = 0; k < 4u; k++)
+                    ed_b(PAGES[pi].id[k] == 0xFFu ? 127u : PAGES[pi].id[k]);
+            }
+        break;
+    }
+    case 101: {                                            /* JM_DESC id: id, fmt, min, max, def, label, unit, names */
+        const param_desc_t *x;
+        int16_t *xp;
+        if (na < 1u || !(x = syn_desc(a[0], &xp)))
+            return;
+        ed_b(a[0]);
+        ed_b(x->fmt);
+        ed_v(x->min);
+        ed_v(x->max);
+        ed_v(x->def);
+        ed_str(x->label, 8);
+        ed_str(x->unit, 8);
+        if (x->names)
+            for (i = 0; i <= (uint32_t)(x->max - x->min) && i < 64u; i++)
+                ed_str(x->names[i], 8);
+        break;
+    }
+    case 102:                                              /* JM_GET id / JM_SET id, v14: id, v14, the value as the screen shows it */
+    case 103: {
+        const param_desc_t *x;
+        int16_t *xp;
+        char val[16];
+        const char *unit;
+        if (na < 1u || !(x = syn_desc(a[0], &xp)) || !xp)
+            return;
+        if (cmd == 103u && na >= 3u && !(a[0] >= 57u && a[0] <= 60u && TSEL->eng_req != ENGI_BYTE)) {   /* (BYTE MEM: on BYTE only) */
+            int32_t v = clamp((int32_t)(a[1] | (uint32_t)a[2] << 7) - 8192, x->min, x->max);
+            *xp = (int16_t)v;
+            syn_changed(a[0], xp);
+            ui.force = 1;
+            x = syn_desc(a[0], &xp);
+        }
+        ed_b(a[0]);
+        ed_v(*xp);
+        if (a[0] == X_LYSOUND) {
+            uint32_t tot, c = layer_pos(&tot);
+            ed_str(c < NBANK ? BANK[c].name : "USER", 15);
+        } else {
+            param_format(x, *xp, val, &unit);
+            ed_str(val, 8);
+            ed_str(unit, 8);
+        }
+        break;
+    }
+    case 104: {                                            /* JM_FX op (0 read, 1 on, 2 off), twist: n, then lit, label per twist */
+        if (na >= 2u && a[1] < TW_N && a[0]) {
+            uint32_t b = 1u << a[1], st;
+            tw_init();
+            if (a[0] == 1u) {
+                if (a[1] == TW_GRAB) {
+                    if (!grb_st)
+                        grb_st = 1;
+                } else if (a[1] == TW_ALLOFF) {
+                    tw_mask = tw_cc = 0;
+                    for (st = 0; st < NSTEP; st++)
+                        tw_auto[st] = 0;
+                } else {
+                    tw_mask |= b;
+                }
+            } else {
+                tw_mask &= ~b, tw_cc &= ~b, tw_auto_now &= ~b;
+                for (st = 0; st < NSTEP; st++)
+                    tw_auto[st] &= ~b;
+                tw_cc_force |= b;
+            }
+            tw_apply();
+            ui.force = 1;
+        }
+        ed_b(TW_N);
+        for (i = 0; i < TW_N; i++) {
+            ed_b(i == TW_CATS ? fl_on : i == TW_GRAB ? grb_st != 0 : (uint32_t)tw_is(i));
+            ed_str(TW_LAB[i], 8);
+        }
+        break;
+    }
+#endif
     case ED_NAMES:                                         /* preset names of an engine */
         if (na < 1u || a[0] >= NENGINES)
             return;

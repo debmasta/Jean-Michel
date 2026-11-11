@@ -160,6 +160,10 @@
   .dsrng { display: inline-flex; align-items: center; gap: 6px; }
   .dsrng input[type=range] { width: 110px; --c: var(--t4); }
   #dsgroups .knob { --c: var(--t4); }
+  .jmfx { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 8px 0 14px; }
+  .jmfx button { padding: 10px 4px; background: var(--s2, #111); color: inherit; border: 1px solid var(--line); cursor: pointer; }
+  .jmfx button.on { background: var(--t1); color: #000; border-color: var(--t1); }
+  #jmpages h3 { margin: 14px 0 0; font-size: inherit; color: var(--t1); }
   .knob { --c: var(--t1); position: relative; padding: 8px 10px 10px; min-width: 0; border-left: 1px solid var(--line);
           display: flex; flex-direction: column; gap: 4px; }
   .knob:first-child { border-left: 0; padding-left: 0; }
@@ -618,6 +622,13 @@
         <p class="dim" data-t="lyHelp"></p>
         <p class="dim" id="lysound"></p>
         <div class="knobs" id="lybody"></div>
+      </div>
+      <!-- Jean-Michel: the FX window and the device's own pages (layer sound, VOICE 4/5, RHYTHM, BYTE MEM, LAYER FX/INS); hidden on other firmware -->
+      <div class="card" id="jmpanel" hidden>
+        <h2>Jean-Michel</h2>
+        <p class="dim">FX : clic = on / off, CHAOS tant que tenu. Les pages ci-dessous sont celles du FM-1, en direct.</p>
+        <div id="jmfx" class="jmfx"></div>
+        <div id="jmpages"></div>
       </div>
       <!-- Clipper 0.9: the TUNING (firmware protocol v14): kept with the FM-1's settings -->
       <div class="card" id="tupanel" hidden>
@@ -3335,6 +3346,24 @@ function makeMockDevice(opt = {}) {
         b(st.smp.length); b(SMP.SLOT_SIZE / 1024);
         st.smp.forEach((u) => { b(u.zones); s(u.zones ? u.name : ""); b(u.zones ? Math.ceil(u.len / 1024) : 0); });
         break;
+      case 100: case 101: case 102: case 103: case 104: {   /* Jean-Michel (?mock=1&jm=1): a few of its pages, the FX window */
+        if (!/[?&]jm=1/.test(location.search)) return null;
+        const J = st.jm = st.jm || { v: { 1: 12, 4: 2, 65: 0, 66: 0, 72: 2, 73: 2, 74: 0 }, fx: 0,
+          d: { 1: ["SOUND", 0, 0, 200, []], 4: ["OCT", 8, 0, 4, ["-2", "-1", "0", "+1", "+2"]], 65: ["FLAM", 3, 0, 127, []], 66: ["STACK", 8, 0, 3, ["OFF", "OCT", "5TH", "OCT+5"]],
+               72: ["F RATE", 8, 0, 7, ["1/4", "1/2", "x1", "x2", "x3", "SLOW", "FAST", "BOUNC"]], 73: ["P RATE", 8, 0, 7, ["1/4", "1/2", "x1", "x2", "x3", "SLOW", "FAST", "BOUNC"]], 74: ["FX ON", 8, 0, 2, ["BOTH", "MAIN", "LAYER"]] } };
+        const LAB = ["stut", "roll", "arp", "oct", "glide", "strdly", "scale", "stair", "pitch-", "pitch+", "filt-", "filt+", "throw", "speed", "ALL OFF", "blink",
+          "bytlfo", "3arp", "mutate", "set A", "set B", "clr rec", "nuance", "footwk", "poly", "CHAOS", "remix", "grab", "break"];
+        if (cmd === 100) { b(3); s("LAYER"); [1, 4, 127, 127].forEach(b); s("VOICE 4"); [65, 66, 127, 127].forEach(b); s("RHYTHM 2"); [72, 73, 74, 127].forEach(b); }
+        else if (cmd === 101) { const d = J.d[a[0]]; if (!d) return null; b(a[0]); b(d[1]); v(d[2]); v(d[3]); v(d[2]); s(d[0]); s(""); d[4].forEach(s); }
+        else if (cmd === 104) { if (a[0] === 1) J.fx |= 1 << a[1]; else if (a[0] === 2) J.fx &= ~(1 << a[1]); if (a[0] === 1 && a[1] === 14) J.fx = 0; b(LAB.length); LAB.forEach((l, i) => { b((J.fx >> i) & 1); s(l); }); }
+        else {
+          const d = J.d[a[0]]; if (!d) return null;
+          if (cmd === 103 && a.length >= 3) J.v[a[0]] = Math.max(d[2], Math.min(d[3], (a[1] | a[2] << 7) - 8192));
+          b(a[0]); v(J.v[a[0]]);
+          if (a[0] === 1) s(["ACID 303", "SOFT KEYS", "MS BASS", "CHIP PUNK"][J.v[1] % 4] + " " + J.v[1]); else { s(d[4].length ? d[4][J.v[a[0]]] : String(J.v[a[0]])); s(d[1] === 3 ? "%" : ""); }
+        }
+        break;
+      }
       default:
         return null;
     }
@@ -10208,6 +10237,85 @@ $("connect").addEventListener("click", () => {
 });
 applyLang();
 showTab(tab);
+/* Jean-Michel (firmware commands 100..104): the FX window's tiles and the device's own pages, polled while connected */
+const JM = { dev: null, pages: null, ctl: new Map(), fx: [], t: {}, polling: false };
+const JM_HIDE = new Set([15, 19, 20, 21]);           /* blink, set A, set B, clr rec: keys of the device itself */
+async function jmProbe() {
+  JM.dev = dev; JM.pages = null; JM.ctl.clear();
+  let a;
+  try { a = await rq([100, []], { timeout: 400, retries: 1, quiet: true }); } catch (e) { $("jmpanel").hidden = true; return; }
+  const r = new Reader(a), n = r.b(), pages = [];
+  for (let i = 0; i < n; i++) { const title = r.s(); pages.push({ title, ids: [r.b(), r.b(), r.b(), r.b()].filter((x) => x !== 127) }); }
+  const box = $("jmpages"); box.replaceChildren();
+  for (const pg of pages) {
+    const row = el("div", { class: "knobs" });
+    for (const id of pg.ids) {
+      let d;
+      try {
+        const q = new Reader(await rq([101, [id]], { timeout: 400 }));
+        d = { id: q.b(), fmt: q.b(), min: q.v(), max: q.v(), def: q.v(), label: q.s(), unit: q.s(), names: [] };
+        while (q.i < q.a.length) d.names.push(q.s());
+      } catch (e) { continue; }
+      const sel = d.names.length > 0;
+      const input = sel ? el("select", {}, ...d.names.map((nm, i) => el("option", { value: d.min + i, text: nm })))
+        : el("input", { type: "range", min: d.min, max: d.max, step: 1 });
+      const out = el("span", { class: "v" });
+      input.addEventListener(sel ? "change" : "input", () => jmSet(id, +input.value));
+      JM.ctl.set(id, { d, input, out });
+      row.append(el("div", { class: "knob" + (sel ? " enum" : "") }, el("span", { class: "kl", text: d.label }), out, input));
+    }
+    box.append(el("h3", { text: pg.title }), row);
+  }
+  JM.pages = pages;
+  $("jmpanel").hidden = false;
+}
+function jmShow(id, a) {
+  const c = JM.ctl.get(id); if (!c) return;
+  const r = new Reader(a); r.b(); const v = r.v(), txt = r.s(), unit = r.i < a.length ? r.s() : "";
+  if (id === 1) { const x = JM.ctl.get(1); x.d.max = Math.max(x.d.max, v); }
+  c.out.textContent = txt + (unit ? " " + unit : "");
+  if (document.activeElement !== c.input && performance.now() - (JM.t[id] || 0) > 800) c.input.value = String(v);
+}
+async function jmSet(id, v) {
+  JM.t[id] = performance.now();
+  try { jmShow(id, await rq([103, [id, ...v14enc(v)]], { key: "jm" + id })); } catch (e) {}
+  if (id === 1) jmRange();                          /* (the layer's sound list: its length) */
+}
+async function jmRange() {
+  try { const q = new Reader(await rq([101, [1]], { timeout: 400 })); q.b(); q.b(); const mn = q.v(), mx = q.v(); const c = JM.ctl.get(1); if (c) { c.input.min = mn; c.input.max = mx; } } catch (e) {}
+}
+function jmFx(a) {
+  const r = new Reader(a), n = r.b(), box = $("jmfx");
+  if (JM.fx.length !== n) {
+    JM.fx = [];
+    box.replaceChildren();
+    for (let i = 0; i < n; i++) {
+      const b = el("button", { type: "button" });
+      if (JM_HIDE.has(i)) b.hidden = true;
+      if (i === 25) {                                 /* CHAOS: as long as it is held */
+        b.addEventListener("pointerdown", () => rq([104, [1, i]]).then(jmFx).catch(() => {}));
+        for (const ev of ["pointerup", "pointerleave"]) b.addEventListener(ev, () => { if (b.classList.contains("on")) rq([104, [2, i]]).then(jmFx).catch(() => {}); });
+      } else {
+        b.addEventListener("click", () => rq([104, [i === 14 ? 1 : b.classList.contains("on") ? 2 : 1, i]]).then(jmFx).catch(() => {}));
+      }
+      JM.fx.push(b); box.append(b);
+    }
+  }
+  for (let i = 0; i < n; i++) { const on = r.b(), lab = r.s(); JM.fx[i].textContent = lab; JM.fx[i].classList.toggle("on", !!on && i !== 14); }
+}
+async function jmPoll() {
+  if (JM.polling) return;
+  JM.polling = true;
+  try {
+    if (!dev || !dev.info || !dev.link) { $("jmpanel").hidden = true; JM.dev = null; return; }
+    if (JM.dev !== dev) { await jmProbe(); if (JM.pages) await jmRange(); }
+    if (!JM.pages) return;
+    jmFx(await rq([104, [0, 0]], { key: "jmfx" }));
+    for (const id of JM.ctl.keys()) jmShow(id, await rq([102, [id]], { key: "jmg" + id }));
+  } catch (e) {
+  } finally { JM.polling = false; }
+}
+setInterval(jmPoll, 700);
 libInit();
 if (!MOCK && !navigator.requestMIDIAccess) sayK("nomidi");
 })();
@@ -10229,6 +10337,7 @@ if (!MOCK && !navigator.requestMIDIAccess) sayK("nomidi");
     btn.hidden = true;
   });
 }/*/PWA*/
+
 </script>
 </body>
 </html>

@@ -99,7 +99,7 @@ static struct { uint8_t stage, note, vel, d; int32_t on, off; } tw_ev[TW_NE];
 static uint32_t tw_acc, tw_st, tw_ticks, tw_oalt;
 static int32_t tw_deg;
 static int16_t tw_mut_base[8];
-static uint8_t tw_mut_have;
+static uint8_t tw_mut_have, tw_mut_eng;           /* (the engine the snapshot is of: another one, a new snapshot) */
 static uint32_t tw_rand = 0x9E3779B9u;
 static uint32_t tw_rnd(uint32_t n) { tw_rand ^= tw_rand << 13; tw_rand ^= tw_rand >> 17; tw_rand ^= tw_rand << 5; return (tw_rand >> 8) % n; }
 /* MIDI, held from outside (the FM-1 PAD plugin, the game controller): CC 102..115 hold twists 0..13 while >= 64, on top of the
@@ -205,8 +205,8 @@ static void tw_on(uint32_t note, uint32_t vel)
         static const uint8_t R[3] = {10, 28, 64};
         const engine_t *e = ENGINES[t->engine % NENGINES];
         uint32_t k, a = tw_ch ? 64u : R[tw_v(TW_MUT, 0)];
-        for (k = 0; k < 8u; k++) {
-            const param_desc_t *d = &e->edit[k];
+        for (k = 0; k < 8u && t->engine == tw_mut_eng && t->eng_req == tw_mut_eng; k++) {   /* (its snapshot's engine only) */
+            const param_desc_t *dd = e->desc ? e->desc(t, k) : 0, *d = dd ? dd : &e->edit[k];
             if (!d->names && d->max > d->min && (tw_mut_have >> k & 1u))
                 t->p[P_E0 + k] = (int16_t)clamp(tw_mut_base[k] + (int32_t)tw_rnd(2u * a + 1u) - (int32_t)a, d->min, d->max);
         }
@@ -585,8 +585,8 @@ static void tw_block(uint32_t adv)
             if (st < last)
                 loops++;
             last = st;
-            for (k = 0; k < 8u; k++) {
-                const param_desc_t *d = &e->edit[k];
+            for (k = 0; k < 8u && trk[0].engine == tw_mut_eng && trk[0].eng_req == tw_mut_eng; k++) {
+                const param_desc_t *dd = e->desc ? e->desc(&trk[0], k) : 0, *d = dd ? dd : &e->edit[k];
                 uint32_t h;
                 if (d->names || d->max <= d->min)
                     continue;
@@ -728,11 +728,13 @@ static void tw_apply(void)
         if (!tw_is(TW_GLIDE))
             tw_kept &= (uint8_t)~1u;
     }
+    if (tw_mut_have && t->eng_req != tw_mut_eng)
+        tw_mut_have = 0;                                /* (the sound changed engine under it: its values are not ours to give back) */
     if ((tw_is(TW_MUT) || tw_is(TW_NUA)) && !tw_mut_have) {         /* MUTATE: the sound as it is, given back when it ends */
         uint32_t k;
         for (k = 0; k < 8u; k++)
             tw_mut_base[k] = t->p[P_E0 + k];
-        tw_mut_have = 0xFFu;
+        tw_mut_have = 0xFFu, tw_mut_eng = t->eng_req;
     } else if (!tw_is(TW_MUT) && !tw_is(TW_NUA) && tw_mut_have) {
         uint32_t k;
         tw_mut_have = 0;
