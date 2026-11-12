@@ -285,9 +285,11 @@
   :root[data-look="machine"] .group > h2 .fbtn { order: 2; margin-left: 0; }
   /* the cable */
   .jmfx button { position: relative; }
-  .jack { position: absolute; right: 3px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle, #d8141b 0 3px, #111 3.5px);
-          box-shadow: 0 0 0 1.5px #000, inset 0 1px 0 #ffffff40; cursor: pointer; }
-  .jack:hover { transform: scale(1.35); }
+  .jack { position: absolute; right: 0; top: 0; bottom: 0; width: 28px; cursor: pointer; background: #1d1d1f radial-gradient(circle, #d8141b 0 4px, #000 4.5px 6.5px, #0000 7px) center / 100% 100% no-repeat;
+          border-left: 2px solid #000; }
+  .jack:hover { background-color: #3a1214; } .jack:hover::after { content: "réglages"; position: absolute; right: 30px; top: 50%; transform: translateY(-50%);
+          background: #1d1d1f; color: #fff; padding: 2px 6px; white-space: nowrap; font-size: 16px; pointer-events: none; z-index: 5; }
+  .jmfx button { padding-right: 32px !important; }
   .fbar .jack.in { position: static; margin-right: 8px; flex: none; }
   .cbwin .fbar { justify-content: flex-start; } .cbwin .fbar b { flex: 1; letter-spacing: 3px; }
   .cbwin { background: #15161a !important; border-color: #0b0b0b !important; border-width: 3px !important; color: #e8ecf5; box-shadow: 6px 6px 0 #0b0b0b !important; }
@@ -325,18 +327,16 @@
   .duo .dside.sel .dscr { box-shadow: 0 0 0 3px var(--wO, #ff9a1f), 0 3px 8px #0008; }
   .dknobs { display: flex; justify-content: space-around; margin-top: 14px; }
   .rk { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: ns-resize; touch-action: none; user-select: none; min-width: 70px; }
-  .rk .cap { width: 60px; height: 60px; border-radius: 50%; position: relative; background: radial-gradient(circle at 38% 32%, #3c3f47, #121318 70%);
-    box-shadow: 0 0 0 3px #000814, 0 0 0 5px #5A73A0, 0 5px 8px #0009; }
-  .rk .cap::before { content: ""; position: absolute; left: 50%; top: 5px; width: 4px; height: 17px; margin-left: -2px; background: var(--c, #fff); border-radius: 2px;
-    transform-origin: 2px 25px; transform: rotate(calc(-135deg + var(--p, 0) * 270deg)); }
-  .rk .cap::after { content: ""; position: absolute; inset: -11px; border-radius: 50%;
-    background: conic-gradient(from 225deg, var(--c, #fff) 0 calc(var(--p, 0) * 270deg), #ffffff18 0 270deg, #0000 0);
-    -webkit-mask: radial-gradient(circle, #0000 37px, #000 38px 42px, #0000 43px); mask: radial-gradient(circle, #0000 37px, #000 38px 42px, #0000 43px); }
+  .rk .cap { width: 60px; height: 60px; border-radius: 50% !important; position: relative; background: radial-gradient(circle at 38% 32%, #3c3f47, #121318 70%);
+    border: 4px solid var(--c); }
+  .rk .cap::before { content: ""; position: absolute; left: 50%; top: 3px; width: 5px; height: 22px; margin-left: -2.5px; background: var(--c, #fff); border-radius: 3px !important;
+    transform-origin: 2.5px 23px; transform: rotate(calc(-135deg + var(--p, 0) * 270deg)); }
   .rk .kl { color: var(--c); letter-spacing: 1px; } .rk .kv { color: var(--fg, #e8f0ff); }
   .dcats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 36px; } .dcats button { height: 44px; letter-spacing: 2px; position: relative; }
   .dcats button.on { background: var(--wO, #ff9a1f); color: #000; }
   .dmid .lab { margin-top: 14px; text-align: center; color: var(--dim); }
   .fxon { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; } .fxon span { letter-spacing: 3px; margin-right: 8px; color: #ffb347; text-shadow: 0 0 6px #ff9a1f; }
+  .fxon .fxhint { margin-left: auto; letter-spacing: 0; text-shadow: none; color: var(--dim); }
   .fxon button { flex: 0 1 160px; height: 36px; letter-spacing: 2px; } .fxon button.on { background: var(--wO, #ff9a1f); color: #000; }
   /* PANNEAU: tiles */
   #p-sound.pm .groups { columns: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; align-items: start; }
@@ -899,7 +899,7 @@
       <div class="card" id="jmpanel" hidden>
         <h2>Jean-Michel</h2>
         <p class="dim">FX : clic = on / off, CHAOS tant que tenu. Les pages ci-dessous sont celles du FM-1, en direct.</p>
-        <div class="fxon" id="fxon"><span>EFFETS SUR</span><button type="button" data-v="0">SYNTH 1 + 2</button><button type="button" data-v="1">SYNTH 1</button><button type="button" data-v="2">LAYER</button></div>
+        <div class="fxon" id="fxon"><span>EFFETS SUR</span><button type="button" data-v="0">SYNTH 1 + 2</button><button type="button" data-v="1">SYNTH 1</button><button type="button" data-v="2">LAYER</button><span class="fxhint">clic : on / off · prise ● ou clic droit : réglages</span></div>
         <div id="jmfx" class="jmfx"></div>
         <div id="jmpages"></div>
       </div>
@@ -10604,6 +10604,7 @@ function jmFx(a) {
         const jk = el("span", { class: "jack", title: "réglages (câblés)" });
         jk.addEventListener("pointerdown", (e) => e.stopPropagation());
         jk.addEventListener("click", (e) => { e.stopPropagation(); cbOpen(i, b); });
+        b.addEventListener("contextmenu", (e) => { e.preventDefault(); cbOpen(i, b); });
         b.jack = jk;
       }
       if (i === 25) {                                 /* CHAOS: as long as it is held */
